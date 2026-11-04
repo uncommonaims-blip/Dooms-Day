@@ -3,11 +3,25 @@ const c=document.getElementById('stage'),g=c.getContext('2d'),speed=document.get
 const colors={near:'#eac18a',far:'#80a9b7',body:'#d5d4c9'};
 function line(a,b,col,w=5){g.strokeStyle=col;g.lineWidth=w;g.lineCap='round';g.beginPath();g.moveTo(...a);g.lineTo(...b);g.stroke()}
 function dot(a,col,r=4){g.fillStyle=col;g.beginPath();g.arc(...a,r,0,Math.PI*2);g.fill()}
-function leg(hip,phase,front,strideLength,ground){const swing=Math.sin(phase),lift=Math.max(0,Math.cos(phase))*11,ankle=[hip[0]+swing*strideLength,ground-lift];const midX=(hip[0]+ankle[0])/2+Math.max(0,-swing)*5,knee=[midX,hip[1]+31-Math.abs(swing)*3];line(hip,knee,front?colors.near:colors.far,6);line(knee,ankle,front?colors.near:colors.far,6);line(ankle,[ankle[0]+(swing>=0?12:7),ankle[1]],front?colors.near:colors.far,5);dot(knee,front?colors.near:colors.far);dot(ankle,front?colors.near:colors.far,3);return ankle}
-function arm(shoulder,phase,front){const swing=Math.sin(phase),elbow=[shoulder[0]-swing*11,shoulder[1]+19],hand=[elbow[0]-swing*10,elbow[1]+16];line(shoulder,elbow,front?colors.near:colors.far,5);line(elbow,hand,front?colors.near:colors.far,5);dot(elbow,front?colors.near:colors.far,3);dot(hand,front?colors.near:colors.far,4)}
+function solveKnee(hip,ankle,upper=39,lower=38){const dx=ankle[0]-hip[0],dy=ankle[1]-hip[1],d=Math.max(.01,Math.min(upper+lower-.01,Math.hypot(dx,dy))),along=(upper*upper-lower*lower+d*d)/(2*d),height=Math.sqrt(Math.max(0,upper*upper-along*along)),ux=dx/d,uy=dy/d;return [hip[0]+ux*along+uy*height,hip[1]+uy*along-ux*height]}
+function leg(hip,phase,front,strideLength,ground){
+const cycle=((phase/(Math.PI*2))%1+1)%1;
+let footX,footY;
+if(cycle<.60){const t=cycle/.60;footX=hip[0]+strideLength*(1-2*t);footY=ground}
+else{const t=(cycle-.60)/.40;const eased=t*t*(3-2*t);footX=hip[0]+strideLength*(-1+2*eased);footY=ground-24*Math.sin(Math.PI*t)}
+const ankle=[footX,footY],knee=solveKnee(hip,ankle),color=front?colors.near:colors.far;
+line(hip,knee,color,6);line(knee,ankle,color,6);
+const toeLift=cycle>=.60?Math.sin(Math.PI*(cycle-.60)/.40)*4:0;
+line(ankle,[ankle[0]+11,ankle[1]-toeLift],color,5);
+dot(knee,color,3);dot(ankle,color,3);return ankle}
+function arm(shoulder,phase,front){
+const swing=Math.sin(phase),color=front?colors.near:colors.far;
+const elbow=[shoulder[0]+swing*12,shoulder[1]+18-Math.max(0,swing)*3];
+const hand=[elbow[0]+swing*7+3,elbow[1]+12-Math.abs(swing)*6];
+line(shoulder,elbow,color,5);line(elbow,hand,color,5);dot(elbow,color,4);dot(hand,color,4)}
 function draw(){g.clearRect(0,0,640,320);g.fillStyle='#1b2934';g.fillRect(0,0,640,320);const ground=256;g.strokeStyle='#607a70';g.lineWidth=2;g.beginPath();g.moveTo(0,ground);g.lineTo(640,ground);g.stroke();for(let x=0;x<640;x+=32){g.fillStyle='#324b50';g.fillRect(x,ground+3,16,3)}
 const phase=frame*Math.PI/4,step=Number(stride.value),bob=Math.abs(Math.sin(phase))*2,center=320,hip=[center,ground-66+bob],shoulder=[center+2,hip[1]-51],neck=[center+2,shoulder[1]-7],head=[center+2,neck[1]-16];
-const rearFoot=leg(hip,phase+Math.PI,false,step,ground);arm(shoulder,phase,false);line(hip,shoulder,colors.body,9);line(shoulder,neck,colors.body,5);dot(head,'#edc59c',13);line([head[0]-13,head[1]-8],[head[0]+12,head[1]-8],'#98734e',5);const nearFoot=leg(hip,phase,true,step,ground);arm(shoulder,phase+Math.PI,true);dot(hip,'#efc88d',5);dot(shoulder,'#efc88d',5);
+const rearFoot=leg(hip,phase+Math.PI,false,step,ground);arm(shoulder,phase+Math.PI,false);line(hip,shoulder,colors.body,9);line(shoulder,neck,colors.body,5);dot(head,'#edc59c',13);line([head[0]-13,head[1]-8],[head[0]+12,head[1]-8],'#98734e',5);const nearFoot=leg(hip,phase,true,step,ground);arm(shoulder,phase,true);dot(hip,'#efc88d',5);dot(shoulder,'#efc88d',5);
 g.fillStyle='#f1ddaf';g.font='16px monospace';g.fillText('FRAME '+(frame+1)+'/8',20,30);g.fillText(['CONTACT','PUSH','PASS','SWING','CONTACT','PUSH','PASS','SWING'][frame],20,52);g.fillText('GROUND',20,ground-10);info.textContent='Frame '+(frame+1)+' of 8 · '+(playing?'Playing':'Paused')+' · stride '+step+' px'}
 function tick(t){if(playing&&t-last>=1000/Number(speed.value)){frame=(frame+1)%8;last=t}draw();requestAnimationFrame(tick)}
 document.getElementById('play').onclick=e=>{playing=!playing;e.target.textContent=playing?'Pause':'Play'};document.getElementById('step').onclick=()=>{playing=false;document.getElementById('play').textContent='Play';frame=(frame+1)%8};document.getElementById('reset').onclick=()=>{frame=0;playing=true;document.getElementById('play').textContent='Pause'};speed.oninput=()=>document.getElementById('fps').textContent=speed.value;requestAnimationFrame(tick);

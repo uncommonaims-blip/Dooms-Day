@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><title>Dooms Day</title><style>
+*{box-sizing:border-box}body{margin:0;background:#090e15;color:#e8dcc0;font:14px Georgia,serif;overflow:hidden}canvas{display:block;width:100vw;height:100dvh;image-rendering:pixelated}#hud{position:fixed;top:12px;left:12px;pointer-events:none;text-shadow:1px 2px #000;line-height:1.6}#help{position:fixed;top:12px;right:12px;max-width:45%;text-align:right;color:#c7b99a;text-shadow:1px 2px #000}#controls{position:fixed;bottom:16px;left:12px;right:12px;display:flex;justify-content:space-between;gap:8px;pointer-events:none}.cluster{display:flex;gap:8px}button{pointer-events:auto;background:#293747c9;border:1px solid #a4a083;color:#fff;border-radius:10px;min-width:55px;min-height:56px;font-size:21px;touch-action:none}button:active{background:#806e48}#message{position:fixed;left:15%;right:15%;top:22%;text-align:center;font-size:18px;color:#f4e6bb;text-shadow:0 2px 4px #000;pointer-events:none}#title{font-weight:bold;letter-spacing:3px;color:#edca85}</style></head><body><canvas id="game" width="480" height="270"></canvas><div id="hud"></div><div id="help">A/D or ←/→ move · Space jump · S/↓ dive<br>Explore and find the hidden descent</div><div id="message"></div><div id="controls"><div class="cluster"><button data-key="left">◀</button><button data-key="right">▶</button></div><div class="cluster"><button data-key="down">▼</button><button data-key="jump">▲</button><button data-key="pulse">◎</button></div></div><script>
+const c=document.getElementById('game'),g=c.getContext('2d');g.imageSmoothingEnabled=false;
+const W=480,H=270,T=16,rooms=[
+{name:'The Forgotten Settlement',w:100,h:18,ground:14,theme:'#252a32',exit:92,entry:5,platforms:[[13,11,7],[28,9,8],[45,11,9],[66,8,10],[82,11,8]],walls:[[22,12,3],[54,12,4]],water:[],items:[['worm',10,12],['food',18,10],['balloon',32,8],['gas',47,9],['lead',63,12],['dog',74,7],['worm',87,10]],child:null},
+{name:'The Rootworks',w:110,h:20,ground:16,theme:'#1b3030',exit:101,entry:7,platforms:[[12,13,10],[32,10,8],[50,13,10],[72,9,12],[91,12,10]],walls:[[25,14,4],[63,14,4]],water:[[38,16,17]],items:[['worm',15,12],['bat',36,9],['food',55,12],['gas',75,8],['lead',93,11]],child:84},
+{name:'The Drowned Passages',w:120,h:21,ground:17,theme:'#1d2c40',exit:113,entry:6,platforms:[[12,14,10],[33,12,10],[55,14,12],[79,10,12],[100,14,10]],walls:[[26,15,4],[68,15,5]],water:[[42,17,28],[89,17,18]],items:[['worm',20,13],['food',39,11],['gas',60,13],['lead',83,9],['worm',106,13]],child:96},
+{name:'The Fungal Wilds',w:130,h:22,ground:18,theme:'#28233c',exit:123,entry:6,platforms:[[14,15,11],[37,12,11],[60,15,12],[86,11,12],[110,14,12]],walls:[[29,16,5],[73,16,5]],water:[[47,18,16]],items:[['worm',19,14],['food',43,11],['gas',65,14],['lead',91,10],['worm',114,13]],child:104},
+{name:'The Threshold of Wonder',w:90,h:19,ground:15,theme:'#273c37',exit:83,entry:6,platforms:[[16,12,9],[35,10,10],[56,12,12],[74,9,9]],walls:[[27,13,3]],water:[[44,15,12]],items:[['worm',20,11],['food',40,9],['gas',60,11]],child:72}
+];
+let level=0,cam=0,frame=0,keys={},last=0,toast='',toastUntil=0,ended=false;
+const p={x:5*T,y:100,vx:0,vy:0,w:10,h:16,grounded:false,light:48,worms:0,balloon:0,lead:0,health:5,food:3,dog:false,bat:false,rescued:0,canary:100};
+const hud=document.getElementById('hud'),msg=document.getElementById('message');
+function say(s){toast=s;toastUntil=frame+210}
+function groundY(r){return r.ground*T}
+function solidRects(r){let a=[[0,groundY(r),r.w*T,400]];for(const [x,y,w] of r.platforms)a.push([x*T,y*T,w*T,7]);for(const [x,y,w] of r.walls)a.push([x*T,y*T,w*T,(r.ground-y)*T]);return a}
+function collide(a,b){return a.x<b[0]+b[2]&&a.x+a.w>b[0]&&a.y<b[1]+b[3]&&a.y+a.h>b[1]}
+function moveAxis(axis,amount,rects){p[axis]+=amount;for(const b of rects)if(collide(p,b)){if(axis==='x'){p.x=amount>0?b[0]-p.w:b[0]+b[2];p.vx=0}else{p.y=amount>0?b[1]-p.h:b[1]+b[3];if(amount>0)p.grounded=true;p.vy=0}}}
+function resetPosition(){p.x=rooms[level].entry*T;p.y=groundY(rooms[level])-p.h-4;p.vx=0;p.vy=0;cam=0}
+function advance(){if(level<rooms.length-1){level++;resetPosition();say('A hidden passage leads deeper...')}else{ended=true;say('Beyond the final passage, a world of impossible beauty awaits. To be continued.')}} 
+function update(){frame++;if(ended)return;const r=rooms[level],down=keys.down||keys.ArrowDown||keys.s, jump=keys.jump||keys[' ']||keys.ArrowUp||keys.w;let water=r.water.some(([x,y,w])=>p.x+p.w>x*T&&p.x<(x+w)*T&&p.y+p.h>y*T-35);let lift=p.balloon*.045,weight=p.lead*.035;let gravity=(water?.11:.36)-lift+weight;gravity=Math.max(water?-.1:.09,gravity);p.vx=((keys.left||keys.ArrowLeft||keys.a)?-1.65:0)+((keys.right||keys.ArrowRight||keys.d)?1.65:0);if(jump&&p.grounded){p.vy=-5.2-p.balloon*.36+p.lead*.2;p.grounded=false}if(water&&jump)p.vy-=.16;if(water&&down)p.vy+=.22+p.lead*.025;p.vy=Math.min(5,Math.max(-3,p.vy+gravity));const rects=solidRects(r);moveAxis('x',p.vx,rects);p.grounded=false;moveAxis('y',p.vy,rects);p.x=Math.max(0,Math.min(r.w*T-p.w,p.x));if(p.y>H+groundY(r)){p.health=Math.max(1,p.health-1);resetPosition()}for(const item of r.items){if(item[3])continue;let dx=p.x-item[1]*T,dy=p.y-item[2]*T;if(Math.abs(dx)<17&&Math.abs(dy)<22){item[3]=true;switch(item[0]){case 'worm':p.worms++;p.light=Math.min(130,48+p.worms*14);say('A glowworm joins your lantern.');break;case 'food':p.food++;p.health=Math.min(5,p.health+1);say('You gather nourishing cave mushrooms.');break;case 'balloon':p.balloon++;say('A red balloon... who could have left it here?');break;case 'gas':if(p.balloon){p.balloon=Math.min(5,p.balloon+1);say('Blue lifting gas fills the balloon.')}else say('Strange blue gas drifts upward.');break;case 'lead':p.lead=Math.min(6,p.lead+1);say('You add lead ballast to your satchel.');break;case 'dog':p.dog=true;say('A lost terrier decides to follow you.');break;case 'bat':p.bat=true;say('A friendly bat reveals hidden contours.');break}}}
+if(r.child!==null&&!r.found&&Math.abs(p.x-r.child*T)<16){r.found=true;p.rescued++;say('You found a missing child! A rescue route is now marked.')}
+if(p.x>(r.exit*T-12)&&p.y>groundY(r)-85){advance()}
+if(frame%1100===0){p.canary=Math.max(0,p.canary-6);if(p.canary<30)say('The canary needs food. Press F to feed it.')}
+cam=Math.max(0,Math.min(r.w*T-W,p.x-W*.38));}
+function rect(x,y,w,h,col){g.fillStyle=col;g.fillRect(Math.round(x),Math.round(y),Math.ceil(w),Math.ceil(h))}
+function render(){const r=rooms[level];g.fillStyle=r.theme;g.fillRect(0,0,W,H);g.save();g.translate(-Math.floor(cam),0);
+for(let i=0;i<r.w;i+=3){let x=i*T,y=25+Math.sin(i*1.7)*19;rect(x,y,30,4,'#343e47');rect(x+8,y+5,7,12,'#29333c')}
+for(const b of solidRects(r)){rect(...b,'#41454a');rect(b[0],b[1],b[2],3,'#6e7168');for(let j=4;j<b[2];j+=17)rect(b[0]+j,b[1]+6,5,3,'#555a58')}
+for(const [x,y,w] of r.water){rect(x*T,y*T-32,w*T,groundY(r)-(y*T-32),'#265675');for(let j=0;j<w*T;j+=15)rect(x*T+j,y*T-32+Math.sin(frame*.05+j)*2,8,2,'#5d9eaf')}
+for(const it of r.items){if(it[3])continue;const [type,x,y]=it;const colors={worm:'#d9f7a1',food:'#c28fc7',balloon:'#e25753',gas:'#65bce9',lead:'#9eabb0',dog:'#b99162',bat:'#8fa3cd'};rect(x*T-4,y*T-5,8,9,colors[type]);if(type==='balloon'){rect(x*T,y*T+4,1,13,'#d6c2a1')}if(type==='worm')rect(x*T-1,y*T-8,3,3,'#fff5c2')}
+if(r.child!==null&&!r.found){rect(r.child*T-4,groundY(r)-23,9,15,'#d1a975');rect(r.child*T-3,groundY(r)-27,7,7,'#e5c9a0')}
+rect(r.exit*T-4,groundY(r)-37,18,37,'#141a21');rect(r.exit*T,groundY(r)-34,10,30,'#11151c');rect(r.exit*T+3,groundY(r)-28,3,4,'#e4c78a');
+if(p.dog){rect(p.x-19,p.y+9,14,7,'#a78962');rect(p.x-17,p.y+5,7,6,'#c4a17a')}
+if(p.bat){rect(p.x+17,p.y-28+Math.sin(frame*.12)*5,13,4,'#94a5bb')}
+rect(p.x,p.y+5,p.w,11,'#8c735b');rect(p.x+2,p.y,p.w-3,7,'#dfbc92');rect(p.x-1,p.y-2,12,3,'#5d4b39');rect(p.x+10,p.y+7,5,7,'#efbf64');rect(p.x+12,p.y+8,2,3,'#fff0a4');
+if(p.balloon){let by=p.y-30-p.balloon*5;rect(p.x+2,by,9+p.balloon*2,12+p.balloon*2,'#c54d4c');rect(p.x+7,p.y-7,1,by+14+p.balloon*2-(p.y-7),'#ad9d83')}
+g.restore();
+const sx=p.x-cam+13,sy=p.y+11;let glow=g.createRadialGradient(sx,sy,10,sx,sy,p.light);glow.addColorStop(0,'rgba(255,220,139,0)');glow.addColorStop(.45,'rgba(10,14,22,.25)');glow.addColorStop(1,'rgba(4,7,13,.96)');g.fillStyle=glow;g.fillRect(0,0,W,H);
+if(p.bat&&(keys.pulse||keys.e||frame%160<28)){g.strokeStyle='rgba(136,198,220,.65)';g.lineWidth=2;g.beginPath();g.arc(sx,sy,25+(frame%160)*3,0,Math.PI*2);g.stroke()}
+hud.innerHTML='<span id="title">DOOMS DAY</span><br>'+r.name+'<br>♥ '+p.health+' &nbsp; ✦ '+p.worms+' &nbsp; 🎈 '+p.balloon+' &nbsp; ⚖ '+p.lead+'<br>Canary '+p.canary+'% · Children '+p.rescued+'/'+rooms.filter(a=>a.child!==null).length;
+msg.textContent=frame<toastUntil?toast:ended?'The adventure continues...':'';
+}
+function loop(t){let dt=Math.min(40,t-last);last=t;if(dt>=0)update();render();requestAnimationFrame(loop)}
+document.addEventListener('keydown',e=>{keys[e.key]=true;if([' ','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key))e.preventDefault();if(e.key==='f'&&p.food>0){p.food--;p.canary=Math.min(100,p.canary+45);say('The canary chirps gratefully.')}});document.addEventListener('keyup',e=>keys[e.key]=false);window.addEventListener('blur',()=>keys={});for(const b of document.querySelectorAll('button')){const k=b.dataset.key;b.addEventListener('pointerdown',e=>{e.preventDefault();keys[k]=true;b.setPointerCapture(e.pointerId)});b.addEventListener('pointerup',()=>keys[k]=false);b.addEventListener('pointercancel',()=>keys[k]=false)}
+say('Find the way down. Bring the children home.');requestAnimationFrame(loop);
+</script></body></html>

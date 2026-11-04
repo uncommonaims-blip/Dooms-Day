@@ -1,4 +1,4 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Dooms Day · Animation Workshop</title><style>*{box-sizing:border-box}body{margin:0;background:#101722;color:#f0e2c4;font:16px system-ui;padding:20px}main{max-width:760px;margin:auto}h1{font:28px Georgia}canvas{width:100%;max-width:640px;background:#1b2934;image-rendering:pixelated;border:1px solid #536272;border-radius:10px}button,input{accent-color:#e6b86d}button{background:#36485b;color:white;border:1px solid #8293a1;border-radius:8px;padding:10px 15px;margin:5px}label{display:block;margin:15px 0}.note{color:#aebdcc}a{color:#e6b86d}</style></head><body><main><h1>Protagonist · Motion Rig V8</h1><p id="build" class="note">Build V8 · 2026-11-04T04:48:40.125Z UTC</p><p id="loaded" class="note"></p><p class="note">12-point articulated skeleton · eight-frame walk loop · foot contact markers. This is the movement foundation, not finished artwork.</p><canvas id="stage" width="640" height="320"></canvas><div><button id="play">Pause</button><button id="step">Next frame</button><button id="reset">Reset</button></div><label>Walking speed <input id="speed" type="range" min="2" max="16" value="8"> <span id="fps">8</span> frames/sec</label><label>Stride length <input id="stride" type="range" min="10" max="30" value="18"></label><p id="info" aria-live="polite"></p><p class="note">Rig landmarks: head, neck, shoulders, elbows, hands, pelvis, knees, ankles. Side view; opposite limbs are tinted blue. Use the frame-step control to inspect contact and passing poses.</p><p><a href="../">Return to game</a></p></main><script>
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Dooms Day · Animation Workshop</title><style>*{box-sizing:border-box}body{margin:0;background:#101722;color:#f0e2c4;font:16px system-ui;padding:20px}main{max-width:760px;margin:auto}h1{font:28px Georgia}canvas{width:100%;max-width:640px;background:#1b2934;image-rendering:pixelated;border:1px solid #536272;border-radius:10px}button,input{accent-color:#e6b86d}button{background:#36485b;color:white;border:1px solid #8293a1;border-radius:8px;padding:10px 15px;margin:5px}label{display:block;margin:15px 0}.note{color:#aebdcc}a{color:#e6b86d}</style></head><body><main><h1>Protagonist · Motion Rig V9</h1><p id="build" class="note">Build V9 · 2026-11-04T04:51:22.162Z UTC</p><p id="loaded" class="note"></p><p class="note">12-point articulated skeleton · eight-frame walk loop · foot contact markers. This is the movement foundation, not finished artwork.</p><canvas id="stage" width="640" height="320"></canvas><div><button id="play">Pause</button><button id="step">Next frame</button><button id="reset">Reset</button></div><label>Walking speed <input id="speed" type="range" min="2" max="16" value="8"> <span id="fps">8</span> frames/sec</label><label>Stride length <input id="stride" type="range" min="10" max="30" value="18"></label><p id="info" aria-live="polite"></p><p class="note">Rig landmarks: head, neck, shoulders, elbows, hands, pelvis, knees, ankles. Side view; opposite limbs are tinted blue. Use the frame-step control to inspect contact and passing poses.</p><p><a href="../">Return to game</a></p></main><script>
 document.getElementById('loaded').textContent='Page loaded: '+new Date().toLocaleString();
 const c=document.getElementById('stage'),g=c.getContext('2d'),speed=document.getElementById('speed'),stride=document.getElementById('stride'),info=document.getElementById('info');let frame=0,playing=true,last=0;
 const colors={near:'#eac18a',far:'#80a9b7',body:'#d5d4c9'};
@@ -16,15 +16,15 @@ const toeLift=cycle>=.60?Math.sin(Math.PI*(cycle-.60)/.40)*4:0;
 line(ankle,[ankle[0]+11,ankle[1]-toeLift],color,5);
 dot(knee,color,3);dot(ankle,color,3);return ankle}
 function arm(shoulder,phase,front){
-// Shoulder-driven pendulum; elbow flexes more on the backswing,
-// and the forearm follows with a small phase delay.
+// Upper arm swings gently from the shoulder. The forearm follows with a
+// delayed forward flick: it continues rising as the upper arm reverses.
 const color=front?colors.near:colors.far;
-const swing=Math.sin(phase);
-const upperAngle=swing*.48;
+const upperAngle=.34*Math.sin(phase);
 const elbow=[shoulder[0]+Math.sin(upperAngle)*31,shoulder[1]+Math.cos(upperAngle)*31];
-const delayed=Math.sin(phase-.38);
-const flex=.10+.23*Math.max(0,-delayed)+.07*Math.abs(delayed)+.72*Math.max(0,swing);
-const forearmAngle=upperAngle+flex;
+// The positive swing peaks AFTER the shoulder's forward-most point.
+// At peak, the forearm points almost horizontally forward and slightly down.
+const follow=Math.max(0,Math.sin(phase-.43));
+const forearmAngle=upperAngle+.12+1.05*follow;
 const hand=[elbow[0]+Math.sin(forearmAngle)*27,elbow[1]+Math.cos(forearmAngle)*27];
 line(shoulder,elbow,color,5);line(elbow,hand,color,5);
 dot(elbow,color,4);dot(hand,color,4)}

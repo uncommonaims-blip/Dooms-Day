@@ -8,7 +8,7 @@ function loadArt(key,url){const img=new Image();img.onload=()=>{art[key]=img;ass
 loadArt('cave','assets/cave/cave-atlas.png');
 loadArt('hero','assets/characters/hero-walk.png');
 const soundtrack=new Audio();soundtrack.loop=true;soundtrack.volume=.35;
-const soundCandidates=['assets/sounds/dooms-day.mp3','assets/sounds/soundtrack.mp3','assets/sounds/background-music.mp3','assets/sounds/doom-trance-sleep.mp3','assets/sounds/music.mp3'];
+const soundCandidates=['assets/sounds/doom-track1.mp3','assets/sounds/the%20doom-track1.mp3','assets/sounds/dooms-day.mp3','assets/sounds/soundtrack.mp3','assets/sounds/background-music.mp3'];
 let soundCandidate=0,soundReady=false;
 function trySound(){if(soundCandidate>=soundCandidates.length)return;soundtrack.src=soundCandidates[soundCandidate++];soundtrack.load()}
 soundtrack.addEventListener('canplay',()=>{soundReady=true},{once:true});

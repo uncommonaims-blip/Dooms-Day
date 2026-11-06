@@ -2,6 +2,23 @@
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><title>Dooms Day</title><style>
 *{box-sizing:border-box}html,body,#game,#controls,#controls *{user-select:none!important;-webkit-user-select:none!important;-webkit-touch-callout:none!important;-webkit-tap-highlight-color:transparent!important}html,body{overscroll-behavior:none}#game,#controls,#controls *{touch-action:none}body{margin:0;background:#090e15;color:#e8dcc0;font:14px Georgia,serif;overflow:hidden}canvas{display:block;width:100vw;height:100dvh;image-rendering:pixelated}#hud{position:fixed;top:12px;left:12px;pointer-events:none;text-shadow:1px 2px #000;line-height:1.6}#help{position:fixed;top:12px;right:12px;max-width:45%;text-align:right;color:#c7b99a;text-shadow:1px 2px #000}#controls{position:fixed;bottom:16px;left:12px;right:12px;display:flex;justify-content:flex-end;gap:8px;pointer-events:none}.cluster{display:flex;gap:9px;align-items:end}#joystickZone{position:fixed;inset:0 35% 0 0;touch-action:none;pointer-events:auto}#joystick{position:fixed;left:0;top:0;width:116px;height:116px;border:2px solid #d4c69a99;border-radius:50%;background:#24334577;box-shadow:0 0 24px #0009,inset 0 0 22px #070e18aa;pointer-events:none;display:none;transform:translate(-50%,-50%);z-index:4}#joystick.active{display:block}#stick{position:absolute;left:50%;top:50%;width:44px;height:44px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#d6c69c,#857d6b);border:2px solid #f2e3bc;transform:translate(-50%,-50%);box-shadow:0 2px 9px #0009}#controls{z-index:5} button{pointer-events:auto;display:grid;place-items:center;background:linear-gradient(145deg,#364657dd,#1b2635ee);border:2px solid #a5a48b;color:#f4e4bc;border-radius:16px;width:60px;height:60px;padding:12px;box-shadow:inset 0 1px #ffffff25,0 4px 0 #0a101a;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent}button svg{display:block;width:100%;height:100%;fill:none;stroke:currentColor;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}button:active,button.pressed{background:#806e48;transform:translateY(3px);box-shadow:inset 0 2px 5px #0008}button[data-key="jump"]{border-color:#e0b976}button[data-key="pulse"]{border-color:#88b6c7}@media(max-width:420px){button{width:52px;height:52px;padding:10px}.cluster{gap:6px}}#message{position:fixed;left:15%;right:15%;top:22%;text-align:center;font-size:18px;color:#f4e6bb;text-shadow:0 2px 4px #000;pointer-events:none}#title{font-weight:bold;letter-spacing:3px;color:#edca85}</style></head><body><canvas id="game" width="480" height="270"></canvas><div id="hud"></div><div id="help">Touch and drag on the left to move / crouch<br>Up + Jump: high · Down + sideways + Jump: low</div><div id="message"></div><div id="joystickZone" aria-label="Touch and drag for movement"></div><div id="joystick" aria-hidden="true"><div id="stick"></div></div><div id="controls"><div class="cluster"><button type="button" data-key="jump" aria-label="Jump" title="Jump"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 15 6-6 6 6"/><path d="M12 9v11"/></svg></button><button type="button" data-key="pulse" aria-label="Bat echolocation" title="Bat echolocation"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="2"/><path d="M7.5 7.5a6.4 6.4 0 0 0 0 9m9-9a6.4 6.4 0 0 1 0 9M4.5 4.5a10.6 10.6 0 0 0 0 15m15-15a10.6 10.6 0 0 1 0 15"/></svg></button></div></div><script>
 const c=document.getElementById('game'),g=c.getContext('2d');g.imageSmoothingEnabled=false;
+// Asset-backed renderer. Images are optional so the prototype remains playable if a file fails.
+const art={cave:null,hero:null},assetStatus={cave:'loading',hero:'loading'};
+function loadArt(key,url){const img=new Image();img.onload=()=>{art[key]=img;assetStatus[key]='ready'};img.onerror=()=>{assetStatus[key]='missing'};img.src=url}
+loadArt('cave','assets/cave/cave-atlas.png');
+loadArt('hero','assets/characters/hero-walk.png');
+const soundtrack=new Audio();soundtrack.loop=true;soundtrack.volume=.35;
+const soundCandidates=['assets/sounds/dooms-day.mp3','assets/sounds/soundtrack.mp3','assets/sounds/background-music.mp3','assets/sounds/doom-trance-sleep.mp3','assets/sounds/music.mp3'];
+let soundCandidate=0,soundReady=false;
+function trySound(){if(soundCandidate>=soundCandidates.length)return;soundtrack.src=soundCandidates[soundCandidate++];soundtrack.load()}
+soundtrack.addEventListener('canplay',()=>{soundReady=true},{once:true});
+soundtrack.addEventListener('error',()=>{if(!soundReady)trySound()});
+trySound();
+const musicButton=document.createElement('button');musicButton.type='button';musicButton.title='Toggle soundtrack';musicButton.setAttribute('aria-label','Toggle soundtrack');musicButton.textContent='♫';musicButton.style.cssText='position:fixed;top:86px;right:12px;z-index:7;width:44px;height:44px;padding:0;font-size:24px';
+document.body.appendChild(musicButton);
+musicButton.addEventListener('click',()=>{if(soundtrack.paused){soundtrack.play().then(()=>musicButton.style.opacity='1').catch(()=>say('Soundtrack not found. Check MP3 filename in assets/sounds.'))}else{soundtrack.pause();musicButton.style.opacity='.55'}});
+function caveTile(index,x,y,w,h){if(!art.cave)return false;const img=art.cave,cols=8,rows=6,cw=img.width/cols,ch=img.height/rows,inset=7;const sx=(index%cols)*cw+inset,sy=Math.floor(index/cols)*ch+inset;g.drawImage(img,sx,sy,cw-inset*2,ch-inset*2,x,y,w,h);return true}
+function drawHero(){if(!art.hero)return false;const img=art.hero,fw=img.width/3,fh=img.height,walking=Math.abs(p.vx)>.15&&p.grounded,idx=walking?Math.floor(frame/10)%3:0;g.save();if(p.facing<0){g.translate(p.x+p.w/2,0);g.scale(-1,1);g.translate(-(p.x+p.w/2),0)}const height=p.crouching?20:30,width=height*.86;g.drawImage(img,idx*fw,0,fw,fh,p.x+p.w/2-width/2,p.y+p.h-height,width,height);g.restore();return true}
 const W=480,H=270,T=16,rooms=[
 {name:'The Forgotten Settlement',w:100,h:18,ground:14,theme:'#252a32',exit:92,entry:5,platforms:[[13,11,7],[28,9,8],[45,11,9],[66,8,10],[82,11,8]],walls:[[22,12,3],[54,12,4]],water:[],items:[['balloon',7,12],['gas',10,10],['worm',14,10],['food',18,10],['gas',32,8],['gas',47,9],['lead',63,13],['dog',74,7],['worm',87,10]],child:null},
 {name:'The Rootworks',w:110,h:20,ground:16,theme:'#1b3030',exit:101,entry:7,platforms:[[12,13,10],[32,10,8],[50,13,10],[72,9,12],[91,12,10]],walls:[[25,14,4],[63,14,4]],water:[[38,16,17]],items:[['worm',15,12],['bat',36,9],['food',55,12],['gas',75,8],['lead',93,15]],child:84},
@@ -48,7 +65,7 @@ cam=Math.max(0,Math.min(r.w*T-W,p.x-W*.38));}
 function rect(x,y,w,h,col){g.fillStyle=col;g.fillRect(Math.round(x),Math.round(y),Math.ceil(w),Math.ceil(h))}
 function render(){const r=rooms[level];g.fillStyle=r.theme;g.fillRect(0,0,W,H);g.save();g.translate(-Math.floor(cam),0);
 for(let i=0;i<r.w;i+=3){let x=i*T,y=25+Math.sin(i*1.7)*19;rect(x,y,30,4,'#343e47');rect(x+8,y+5,7,12,'#29333c')}
-for(const b of solidRects(r)){rect(b[0],b[1],b[2],b[3],b[4]==='oneway'?'#8d6a43':'#41454a');rect(b[0],b[1],b[2],3,'#6e7168');for(let j=4;j<b[2];j+=17)rect(b[0]+j,b[1]+6,5,3,'#555a58')}
+for(const b of solidRects(r)){rect(b[0],b[1],b[2],b[3],b[4]==='oneway'?'#8d6a43':'#41454a');rect(b[0],b[1],b[2],3,'#6e7168');for(let j=0;j<b[2];j+=32){const bw=Math.min(32,b[2]-j);caveTile(b[1]>=groundY(r)?0:(j===0?2:3),b[0]+j,b[1]-6,bw,Math.min(38,Math.max(16,b[3])))}for(let j=4;j<b[2];j+=17)rect(b[0]+j,b[1]+6,5,3,'#555a58')}
 for(const [x,y,w] of r.water){rect(x*T,y*T-32,w*T,groundY(r)-(y*T-32),'#265675');for(let j=0;j<w*T;j+=15)rect(x*T+j,y*T-32+Math.sin(frame*.05+j)*2,8,2,'#5d9eaf')}
 for(const it of r.items){if(it[3])continue;const [type,x,y]=it;const colors={worm:'#d9f7a1',food:'#c28fc7',balloon:'#e25753',gas:'#65bce9',lead:'#9eabb0',dog:'#b99162',bat:'#8fa3cd'};rect(x*T-4,y*T-5,8,9,colors[type]);if(type==='balloon'){rect(x*T,y*T+4,1,13,'#d6c2a1')}if(type==='worm')rect(x*T-1,y*T-8,3,3,'#fff5c2')}
 if(r.child!==null&&!r.found){rect(r.child*T-4,groundY(r)-23,9,15,'#d1a975');rect(r.child*T-3,groundY(r)-27,7,7,'#e5c9a0')}
@@ -56,11 +73,13 @@ rect(r.exit*T-4,groundY(r)-37,18,37,'#141a21');rect(r.exit*T,groundY(r)-34,10,30
 if(p.dog){rect(p.x-19,p.y+9,14,7,'#a78962');rect(p.x-17,p.y+5,7,6,'#c4a17a')}
 if(p.bat){rect(p.x+17,p.y-28+Math.sin(frame*.12)*5,13,4,'#94a5bb')}
 const face=p.facing;
+if(!drawHero()){
 rect(p.x,p.y+(p.crouching?2:5),p.w,p.h-(p.crouching?2:5),'#8c735b');
 rect(p.x+2,p.y,p.w-3,p.crouching?5:7,'#dfbc92');
 rect(p.x-1,p.y-2,12,3,'#5d4b39');
 rect(face>0?p.x+p.w:p.x-5,p.y+(p.crouching?3:7),5,7,'#efbf64');
 rect(face>0?p.x+p.w+2:p.x-3,p.y+(p.crouching?4:8),2,3,'#fff0a4');
+}
 if(p.balloon){let by=p.y-30-p.balloon*5;rect(p.x+2,by,9+p.balloon*2,12+p.balloon*2,'#c54d4c');rect(p.x+7,p.y-7,1,by+14+p.balloon*2-(p.y-7),'#ad9d83')}
 g.restore();
 const sx=p.x-cam+(p.facing>0?13:-3),sy=p.y+11;let glow=g.createRadialGradient(sx,sy,10,sx,sy,p.light);glow.addColorStop(0,'rgba(255,220,139,0)');glow.addColorStop(.45,'rgba(10,14,22,.25)');glow.addColorStop(1,'rgba(4,7,13,.96)');g.fillStyle=glow;g.fillRect(0,0,W,H);

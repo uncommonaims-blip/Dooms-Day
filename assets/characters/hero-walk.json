@@ -3,38 +3,72 @@
   "image": "hero-walk.png",
   "imageWidth": 2172,
   "imageHeight": 724,
-  "frameWidth": 724,
-  "frameHeight": 724,
-  "columns": 3,
+  "columns": 8,
   "rows": 1,
-  "frameCount": 3,
+  "frameCount": 8,
+  "frameWidth": 271.5,
+  "frameHeight": 724,
   "frames": [
     {
-      "name": "pose-1",
+      "name": "walk-1",
       "x": 0,
       "y": 0,
-      "width": 724,
+      "width": 271.5,
       "height": 724
     },
     {
-      "name": "pose-2",
-      "x": 724,
+      "name": "walk-2",
+      "x": 271.5,
       "y": 0,
-      "width": 724,
+      "width": 271.5,
       "height": 724
     },
     {
-      "name": "pose-3",
-      "x": 1448,
+      "name": "walk-3",
+      "x": 543,
       "y": 0,
-      "width": 724,
+      "width": 271.5,
+      "height": 724
+    },
+    {
+      "name": "walk-4",
+      "x": 814.5,
+      "y": 0,
+      "width": 271.5,
+      "height": 724
+    },
+    {
+      "name": "walk-5",
+      "x": 1086,
+      "y": 0,
+      "width": 271.5,
+      "height": 724
+    },
+    {
+      "name": "walk-6",
+      "x": 1357.5,
+      "y": 0,
+      "width": 271.5,
+      "height": 724
+    },
+    {
+      "name": "walk-7",
+      "x": 1629,
+      "y": 0,
+      "width": 271.5,
+      "height": 724
+    },
+    {
+      "name": "walk-8",
+      "x": 1900.5,
+      "y": 0,
+      "width": 271.5,
       "height": 724
     }
   ],
   "animation": {
     "configured": true,
-    "fps": 5,
-    "loop": true,
-    "note": "Three source poses used as a provisional walk cycle; more frames needed for fluid motion."
+    "fps": 9,
+    "loop": true
   }
 }

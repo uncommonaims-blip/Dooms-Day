@@ -4,7 +4,29 @@
 const c=document.getElementById('game'),g=c.getContext('2d');g.imageSmoothingEnabled=false;
 // Asset-backed renderer. Images are optional so the prototype remains playable if a file fails.
 const art={cave:null,hero:null},assetStatus={cave:'loading',hero:'loading'};
-function loadArt(key,url){const img=new Image();img.onload=()=>{art[key]=img;assetStatus[key]='ready'};img.onerror=()=>{assetStatus[key]='missing'};img.src=url}
+function removeAtlasBackdrop(img){
+ const cols=8,rows=6,cw=Math.floor(img.width/cols),ch=Math.floor(img.height/rows);
+ const cv=document.createElement('canvas');cv.width=img.width;cv.height=img.height;
+ const ctx=cv.getContext('2d',{willReadFrequently:true});ctx.drawImage(img,0,0);
+ const image=ctx.getImageData(0,0,cv.width,cv.height),d=image.data;
+ // Only clear near-neutral, edge-connected background pixels within each atlas cell.
+ // Interior gray rocks are protected by the flood-fill boundary.
+ for(let row=0;row<rows;row++)for(let col=0;col<cols;col++){
+  const x0=col*cw,y0=row*ch,w=Math.min(cw,cv.width-x0),h=Math.min(ch,cv.height-y0);
+  const corners=[[1,1],[w-2,1],[1,h-2],[w-2,h-2]].map(([x,y])=>{const k=((y0+y)*cv.width+x0+x)*4;return [d[k],d[k+1],d[k+2]]});
+  const neutral=corners.filter(c=>Math.max(...c)-Math.min(...c)<35);
+  if(!neutral.length)continue;
+  const base=[0,1,2].map(k=>neutral.reduce((a,c)=>a+c[k],0)/neutral.length);
+  const match=(x,y)=>{const k=((y0+y)*cv.width+x0+x)*4;const delta=Math.max(Math.abs(d[k]-base[0]),Math.abs(d[k+1]-base[1]),Math.abs(d[k+2]-base[2]));return d[k+3]>0&&delta<43&&Math.max(d[k],d[k+1],d[k+2])-Math.min(d[k],d[k+1],d[k+2])<48};
+  const seen=new Uint8Array(w*h),queue=[];
+  const push=(x,y)=>{const n=y*w+x;if(seen[n])return;seen[n]=1;if(match(x,y))queue.push(n)};
+  for(let x=0;x<w;x++){push(x,0);push(x,h-1)}
+  for(let y=1;y<h-1;y++){push(0,y);push(w-1,y)}
+  for(let head=0;head<queue.length;head++){const n=queue[head],x=n%w,y=(n/w)|0,k=((y0+y)*cv.width+x0+x)*4;d[k+3]=0;if(x>0)push(x-1,y);if(x+1<w)push(x+1,y);if(y>0)push(x,y-1);if(y+1<h)push(x,y+1)}
+ }
+ ctx.putImageData(image,0,0);return cv;
+}
+function loadArt(key,url){const img=new Image();img.onload=()=>{try{art[key]=key==='cave'?removeAtlasBackdrop(img):img;assetStatus[key]='ready'}catch(e){console.warn('Atlas cleanup fallback',e);art[key]=img;assetStatus[key]='ready'}};img.onerror=()=>{assetStatus[key]='missing'};img.src=url}
 loadArt('cave','assets/cave/cave-atlas.png');
 loadArt('hero','assets/characters/hero-walk.png');
 const soundtrack=new Audio();soundtrack.loop=true;soundtrack.volume=.35;
@@ -53,7 +75,7 @@ const W=480,H=270,T=16,rooms=[
 ];
 let level=0,cam=0,frame=0,keys={},stickInput={x:0,y:0},jumpHeld=false,last=0,toast='',toastUntil=0,ended=false;
 const p={x:5*T,y:100,vx:0,vy:0,w:10,h:16,facing:1,crouching:false,grounded:false,light:48,worms:0,balloon:0,lead:0,health:5,food:3,dog:false,bat:false,rescued:0,canary:100};
-const GAME_VERSION='0.58.0';
+const GAME_VERSION='0.59.0';
 const versionTag=document.createElement('div');
 versionTag.id='game-version';
 versionTag.textContent='DOOMS DAY · v'+GAME_VERSION;

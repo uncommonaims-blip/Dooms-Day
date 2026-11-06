@@ -53,6 +53,12 @@ const W=480,H=270,T=16,rooms=[
 ];
 let level=0,cam=0,frame=0,keys={},stickInput={x:0,y:0},jumpHeld=false,last=0,toast='',toastUntil=0,ended=false;
 const p={x:5*T,y:100,vx:0,vy:0,w:10,h:16,facing:1,crouching:false,grounded:false,light:48,worms:0,balloon:0,lead:0,health:5,food:3,dog:false,bat:false,rescued:0,canary:100};
+const GAME_VERSION='0.56.0';
+const versionTag=document.createElement('div');
+versionTag.id='game-version';
+versionTag.textContent='DOOMS DAY · v'+GAME_VERSION;
+versionTag.style.cssText='position:fixed;top:8px;left:50%;transform:translateX(-50%);z-index:8;background:#09111dcc;color:#f0d99d;border:1px solid #bfa36a88;border-radius:7px;padding:5px 10px;font:700 12px system-ui,sans-serif;letter-spacing:.6px;pointer-events:none;white-space:nowrap;text-shadow:0 1px 2px #000';
+document.body.appendChild(versionTag);
 const hud=document.getElementById('hud'),msg=document.getElementById('message');
 function say(s){toast=s;toastUntil=frame+210}
 function groundY(r){return r.ground*T}

@@ -49,9 +49,13 @@ function caveBackdrop(r){
  }
  g.restore();
 }
+function drawStalactite(x,y,w,h){g.fillStyle='#35383b';g.beginPath();g.moveTo(x,y);g.lineTo(x+w,y);g.lineTo(x+w*.56,y+h);g.lineTo(x+w*.33,y+h*.57);g.closePath();g.fill();g.strokeStyle='#64605b';g.lineWidth=1.5;g.beginPath();g.moveTo(x+3,y+2);g.lineTo(x+w*.48,y+h*.73);g.stroke()}
+function drawStalagmite(x,base,w,h){g.fillStyle='#414344';g.beginPath();g.moveTo(x,base);g.lineTo(x+w*.43,base-h);g.lineTo(x+w,base);g.closePath();g.fill();g.strokeStyle='#797066';g.lineWidth=2;g.beginPath();g.moveTo(x+4,base-2);g.lineTo(x+w*.43,base-h+8);g.stroke()}
+function drawBalloon(x,y,scale=1){g.save();g.translate(x,y);g.scale(scale,scale);g.fillStyle='#9d2535';g.beginPath();g.ellipse(0,0,10,14,0,0,Math.PI*2);g.fill();g.fillStyle='#e44c53';g.beginPath();g.ellipse(-2,-2,7,11,-.12,0,Math.PI*2);g.fill();g.fillStyle='#ffc5b0';g.beginPath();g.ellipse(-4,-6,2,5,-.3,0,Math.PI*2);g.fill();g.fillStyle='#a32c3a';g.beginPath();g.moveTo(-3,12);g.lineTo(3,12);g.lineTo(0,18);g.fill();g.restore()}
+function drawBat(x,y){const flap=Math.sin(frame*.32)*5;g.save();g.translate(x,y);g.fillStyle='#71819b';g.beginPath();g.moveTo(0,0);g.quadraticCurveTo(-9,-9-flap,-17,-4-flap);g.lineTo(-13,5);g.lineTo(-8,2);g.lineTo(-4,6);g.lineTo(0,2);g.quadraticCurveTo(9,-9-flap,17,-4-flap);g.lineTo(13,5);g.lineTo(8,2);g.lineTo(4,6);g.closePath();g.fill();g.fillStyle='#a4b5c8';g.beginPath();g.ellipse(0,0,4,6,0,0,Math.PI*2);g.fill();g.fillStyle='#d5dfe5';g.fillRect(-3,-2,2,2);g.fillRect(2,-2,2,2);g.restore()}
 function caveTerrain(r){
  const ground=groundY(r);
- const startX=Math.max(0,Math.floor(cam/64)*64-64),endX=Math.min(r.w*T,cam+W+96);
+ const startX=Math.max(0,Math.floor(cam/64)*64-96),endX=Math.min(r.w*T,cam+W/WORLD_ZOOM+144);
  // Continuous collision-aligned stone underlay: no open seams between decorative atlas sprites.
  g.fillStyle='#24262b';g.fillRect(startX,ground,endX-startX,Math.max(H-ground,120));
  g.fillStyle='#42403b';g.fillRect(startX,ground-5,endX-startX,9);
@@ -63,24 +67,28 @@ function caveTerrain(r){
   caveTile(((n%3)+3)%3,x-3,ground-16,step+overlap,83);
   caveTile(8+((n%4)+4)%4,x-3,ground+48,step+overlap,72);
  }
+ // Ceiling ridge and hanging formations remain transparent, never gray atlas rectangles.
+ g.fillStyle='#282a2e';g.fillRect(startX,-30,endX-startX,32);
+ for(let x=Math.floor(startX/62)*62;x<endX;x+=62)drawStalactite(x+8,0,29,27+Math.abs(Math.floor(x/62)%4)*10);
  // Platforms use one continuous top and core, with illustrations layered over them.
  for(const [tx,ty,tw] of r.platforms){
   const x=tx*T,y=ty*T,w=tw*T;
   g.fillStyle='#373630';g.fillRect(x,y,w,19);
   g.fillStyle='#75634b';g.fillRect(x,y-3,w,5);
-  for(let j=0;j<w;j+=42)caveTile(j===0?2:j+42>=w?4:3,x+j-2,y-19,Math.min(50,w-j+4),45);
+  for(let j=0;j<w;j+=42)caveTile(j===0?2:j+42>=w?4:3,x+j-6,y-19,Math.min(58,w-j+10),45);
+  for(let j=22;j<w-12;j+=57)drawStalactite(x+j,y+17,18,24+(j%3)*8);
  }
  for(const [tx,ty,tw] of r.walls){
   const x=tx*T,y=ty*T,w=tw*T;
   g.fillStyle='#34343a';g.fillRect(x,y,w,Math.max(0,ground-y));
   g.fillStyle='#75634b';g.fillRect(x,y-3,w,5);
-  for(let j=0;j<w;j+=42)caveTile(j===0?9:10,x+j-2,y-12,Math.min(50,w-j+4),ground-y+20);
+  for(let j=0;j<w;j+=42)caveTile(j===0?9:10,x+j-6,y-12,Math.min(58,w-j+10),ground-y+20);
  }
  for(let i=Math.floor(startX/144);i<=Math.ceil(endX/144);i++){
   const x=i*144+43,choice=Math.abs(i)%4;
-  if(choice===0)caveTile(16+(Math.abs(i)%3),x,-4,38,58);
-  if(choice===1)caveTile(19+(Math.abs(i)%3),x,ground-47,38,48);
-  if(choice===2)caveTile(22,x,ground-73,42,72);
+  if(choice===0)drawStalactite(x,0,36,48+Math.abs(i%3)*10);
+  if(choice===1)drawStalagmite(x,ground,35,45);
+  if(choice===2)drawStalagmite(x,ground,42,70);
   if(choice===3)caveTile(24+(Math.abs(i)%3),x,ground-29,35,30);if(i%3===0)caveTile(30+(Math.abs(i)%4),x+66,ground-37,26,38);
  }
 }
@@ -96,7 +104,7 @@ let W=480,H=270;const T=16,rooms=[
 ];
 let level=0,cam=0,frame=0,keys={},stickInput={x:0,y:0},jumpHeld=false,last=0,toast='',toastUntil=0,ended=false;
 const p={x:5*T,y:100,vx:0,vy:0,w:10,h:16,facing:1,crouching:false,grounded:false,light:48,worms:0,balloon:0,lead:0,health:5,food:3,dog:false,bat:false,rescued:0,canary:100};
-const GAME_VERSION='0.66.0';
+const GAME_VERSION='0.67.0';
 const versionTag=document.createElement('div');
 versionTag.id='game-version';
 versionTag.textContent='DOOMS DAY · v'+GAME_VERSION;
@@ -166,7 +174,7 @@ g.restore();}
 if(r.child!==null&&!r.found){rect(r.child*T-4,groundY(r)-23,9,15,'#d1a975');rect(r.child*T-3,groundY(r)-27,7,7,'#e5c9a0')}
 rect(r.exit*T-4,groundY(r)-37,18,37,'#141a21');rect(r.exit*T,groundY(r)-34,10,30,'#11151c');rect(r.exit*T+3,groundY(r)-28,3,4,'#e4c78a');
 if(p.dog){rect(p.x-19,p.y+9,14,7,'#a78962');rect(p.x-17,p.y+5,7,6,'#c4a17a')}
-if(p.bat){rect(p.x+17,p.y-28+Math.sin(frame*.12)*5,13,4,'#94a5bb')}
+if(p.bat)drawBat(p.x+23,p.y-28+Math.sin(frame*.12)*5)
 const face=p.facing;
 if(!drawHero()){
 rect(p.x,p.y+(p.crouching?2:5),p.w,p.h-(p.crouching?2:5),'#8c735b');
@@ -175,7 +183,7 @@ rect(p.x-1,p.y-2,12,3,'#5d4b39');
 rect(face>0?p.x+p.w:p.x-5,p.y+(p.crouching?3:7),5,7,'#efbf64');
 rect(face>0?p.x+p.w+2:p.x-3,p.y+(p.crouching?4:8),2,3,'#fff0a4');
 }
-if(p.balloon){let by=p.y-30-p.balloon*5;rect(p.x+2,by,9+p.balloon*2,12+p.balloon*2,'#c54d4c');rect(p.x+7,p.y-7,1,by+14+p.balloon*2-(p.y-7),'#ad9d83')}
+if(p.balloon){const bx=p.x+p.w/2,by=p.y-102-Math.min(12,p.balloon*2)+Math.sin(frame*.05)*2;g.strokeStyle='#d7c3a4';g.lineWidth=1;g.beginPath();g.moveTo(bx,by+17);g.quadraticCurveTo(bx+8,by+40,bx,p.y+2);g.stroke();drawBalloon(bx,by,1.15)}
 g.restore();
 const verticalCameraLight=Math.max(0,groundY(r)-H/WORLD_ZOOM+24);const sx=(p.x-cam+p.w/2)*WORLD_ZOOM,sy=(p.y+p.h*.43-verticalCameraLight)*WORLD_ZOOM;
 const lightRadius=Math.max(72,72+(p.worms||0)*22,p.light||0)*WORLD_ZOOM;
@@ -189,9 +197,33 @@ shade.addColorStop(.68,'rgba(4,7,13,.26)');
 shade.addColorStop(.86,'rgba(4,7,13,.73)');
 shade.addColorStop(1,'rgba(4,7,13,.96)');
 g.fillStyle=shade;g.fillRect(0,0,W,H);
-if(p.bat&&(keys.pulse||keys.e||frame%160<28)){g.strokeStyle='rgba(136,198,220,.65)';g.lineWidth=2;g.beginPath();g.arc(sx,sy,25+(frame%160)*3,0,Math.PI*2);g.stroke()}
+if(p.bat)renderEcho(r,sx,sy,verticalCameraLight);
 hud.innerHTML='<span id="title">DOOMS DAY</span><br>'+r.name+'<br>♥ '+p.health+' &nbsp; ✦ '+p.worms+' &nbsp; 🎈 '+p.balloon+' &nbsp; ⚖ '+p.lead+'<br>Canary '+p.canary+'% · Children '+p.rescued+'/'+rooms.filter(a=>a.child!==null).length;
 msg.textContent=frame<toastUntil?toast:ended?'The adventure continues...':'';
+}
+function renderEcho(r,sx,sy,verticalCamera){
+ const cycle=frame%180,radius=cycle*3.8,originX=sx+20*WORLD_ZOOM,originY=sy-23*WORLD_ZOOM;
+ if(cycle>145)return;
+ g.save();g.beginPath();g.rect(0,0,W,H);g.clip();
+ g.strokeStyle='rgba(123,211,235,'+(0.22*(1-cycle/180))+')';g.lineWidth=1.4;
+ g.beginPath();g.arc(originX,originY,radius,0,Math.PI*2);g.stroke();
+ const surfaces=solidRects(r);
+ // Echo contacts: briefly outline the struck surface and return a short reflected ripple.
+ for(const b of surfaces){
+  const x=(b[0]-cam)*WORLD_ZOOM,y=(b[1]-verticalCamera)*WORLD_ZOOM,w=b[2]*WORLD_ZOOM,h=b[3]*WORLD_ZOOM;
+  if(x>W+20||x+w<0||y>H+20||y+h<0)continue;
+  const px=Math.max(x,Math.min(originX,x+w)),py=Math.max(y,Math.min(originY,y+h));
+  const dist=Math.hypot(px-originX,py-originY),delta=radius-dist;
+  if(delta>=0&&delta<55){
+   const a=.52*(1-delta/55);
+   g.strokeStyle='rgba(140,224,243,'+a+')';g.lineWidth=1.4;
+   g.beginPath();g.moveTo(Math.max(0,x),y);g.lineTo(Math.min(W,x+w),y);g.stroke();
+   g.fillStyle='rgba(175,239,255,'+a+')';
+   for(let j=0;j<5;j++){const xx=px+Math.sin(j*17+frame*.12)*14,yy=py+Math.cos(j*13+frame*.09)*6;g.fillRect(xx,yy,2,2)}
+   g.strokeStyle='rgba(120,209,232,'+(a*.5)+')';g.beginPath();g.arc(px,py,Math.max(2,delta*.55),0,Math.PI*2);g.stroke();
+  }
+ }
+ g.restore();
 }
 function loop(t){let dt=Math.min(40,t-last);last=t;if(dt>=0)update();render();requestAnimationFrame(loop)}
 document.addEventListener('keydown',e=>{keys[e.key]=true;if([' ','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key))e.preventDefault();if(e.key==='f'&&p.food>0){p.food--;p.canary=Math.min(100,p.canary+45);say('The canary chirps gratefully.')}});document.addEventListener('keyup',e=>keys[e.key]=false);window.addEventListener('blur',()=>{keys={};stickInput={x:0,y:0};jumpHeld=false;hideJoystick()});const joystickZone=document.getElementById('joystickZone'),joystick=document.getElementById('joystick'),knob=document.getElementById('stick');

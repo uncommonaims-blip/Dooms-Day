@@ -35,9 +35,9 @@ function buildImagePalette(){
  function tileButton(img,kind,index,cols,rows,target){
   const b=document.createElement('button'),preview=document.createElement('canvas');preview.width=96;preview.height=76;
   const q=preview.getContext('2d'),cw=img.width/cols,ch=img.height/rows;
-  q.imageSmoothingEnabled=false;q.drawImage(img,(index%cols)*cw,Math.floor(index/cols)*ch,cw,ch,3,3,90,70);
+  q.imageSmoothingEnabled=false;const inset=kind==='atlas'?9:0;q.drawImage(img,(index%cols)*cw+inset,Math.floor(index/cols)*ch+inset,cw-2*inset,ch-2*inset,3,3,90,70);
   b.append(preview);const label=document.createElement('small');label.textContent=kind+' '+index;b.append(label);
-  b.onclick=()=>{tool=kind+':'+index;for(const el of document.querySelectorAll('#palette button,#atlasPalette button,#heroPalette button'))el.classList.remove('active');b.classList.add('active');status.textContent='Place '+kind+' '+index+' (original image)'};
+  b.onclick=()=>{tool=kind+':'+index;for(const el of document.querySelectorAll('#palette button,#atlasPalette button,#heroPalette button'))el.classList.remove('active');b.classList.add('active');status.textContent='Place '+kind+' '+index+' (cropped to its own tile)'};
   target.append(b);
  }
  if(cleanedAtlas)for(let i=0;i<48;i++)tileButton(cleanedAtlas,'atlas',i,8,6,ap);
@@ -46,12 +46,12 @@ function buildImagePalette(){
 function snap(v){return document.querySelector('#snap').checked?Math.round(v/16)*16:Math.round(v)}
 function point(e){const r=canvas.getBoundingClientRect();return{x:(e.clientX-r.left)*canvas.width/r.width,y:(e.clientY-r.top)*canvas.height/r.height}}
 function hit(p){for(let i=objects.length-1;i>=0;i--){const o=objects[i];if(Math.abs(p.x-o.x)<o.w/2&&Math.abs(p.y-o.y)<o.h/2)return i}return -1}
-canvas.addEventListener('pointerdown',e=>{e.preventDefault();const p=point(e);if(tool==='select'){selected=hit(p);if(selected>=0){snapshot();drag={id:e.pointerId,dx:p.x-objects[selected].x,dy:p.y-objects[selected].y};canvas.setPointerCapture(e.pointerId)}}else{snapshot();const n=+size.value;objects.push({type:tool,x:snap(p.x),y:snap(p.y),w:n,h:tool==='floor'||tool==='platform'?Math.round(n/2):n,layer:layer.value,flip:false});selected=objects.length-1;draw()}});
+canvas.addEventListener('pointerdown',e=>{e.preventDefault();const p=point(e);if(tool==='select'){selected=hit(p);if(selected>=0){snapshot();drag={id:e.pointerId,dx:p.x-objects[selected].x,dy:p.y-objects[selected].y};canvas.setPointerCapture(e.pointerId)}}else{snapshot();const n=tool.startsWith('atlas:')?64:+size.value;objects.push({type:tool,x:snap(p.x),y:snap(p.y),w:n,h:tool==='floor'||tool==='platform'?Math.round(n/2):n,layer:layer.value,flip:false});selected=objects.length-1;draw()}});
 canvas.addEventListener('pointermove',e=>{if(!drag||drag.id!==e.pointerId||selected<0)return;const p=point(e);objects[selected].x=snap(p.x-drag.dx);objects[selected].y=snap(p.y-drag.dy);draw()});
 for(const ev of ['pointerup','pointercancel','lostpointercapture'])canvas.addEventListener(ev,()=>drag=null);
 function stone(x,y,w,h,color){ctx.fillStyle=color;ctx.fillRect(x,y,w,h);ctx.fillStyle='#817b70';ctx.fillRect(x,y,w,Math.min(4,h))}
 function paint(o){const{x,y,w,h,type}=o;ctx.save();ctx.translate(x,y);if(o.flip)ctx.scale(-1,1);const l=-w/2,t=-h/2;
- if(type.startsWith('atlas:')&&cleanedAtlas){const i=+type.split(':')[1],cw=cleanedAtlas.width/8,ch=cleanedAtlas.height/6;ctx.drawImage(cleanedAtlas,(i%8)*cw,Math.floor(i/8)*ch,cw,ch,l,t,w,h);ctx.restore();return}
+ if(type.startsWith('atlas:')&&cleanedAtlas){const i=+type.split(':')[1],cw=cleanedAtlas.width/8,ch=cleanedAtlas.height/6;ctx.drawImage(cleanedAtlas,(i%8)*cw+9,Math.floor(i/8)*ch+9,cw-18,ch-18,l,t,w,h);ctx.restore();return}
  if(type.startsWith('heroFrame:')&&heroSheet.complete&&heroSheet.naturalWidth){const i=+type.split(':')[1],cw=heroSheet.width/8;ctx.drawImage(heroSheet,i*cw,0,cw,heroSheet.height,l,t,w,h);ctx.restore();return}
  switch(type){
 case'floor':case'wall':case'platform':stone(l,t,w,h,type==='wall'?'#40444c':'#484744');break;

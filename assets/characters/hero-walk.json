@@ -1,6 +1,6 @@
 {
-  "name": "miner-poses",
-  "image": "miner-poses.png",
+  "name": "hero-walk",
+  "image": "hero-walk.png",
   "imageWidth": 2172,
   "imageHeight": 724,
   "frameWidth": 724,
@@ -32,7 +32,9 @@
     }
   ],
   "animation": {
-    "configured": false,
-    "note": "Three illustrated poses; not yet verified as a seamless walking cycle."
+    "configured": true,
+    "fps": 5,
+    "loop": true,
+    "note": "Three source poses used as a provisional walk cycle; more frames needed for fluid motion."
   }
 }

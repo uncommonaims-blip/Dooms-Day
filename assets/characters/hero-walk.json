@@ -1,0 +1,38 @@
+{
+  "name": "miner-poses",
+  "image": "miner-poses.png",
+  "imageWidth": 2172,
+  "imageHeight": 724,
+  "frameWidth": 724,
+  "frameHeight": 724,
+  "columns": 3,
+  "rows": 1,
+  "frameCount": 3,
+  "frames": [
+    {
+      "name": "pose-1",
+      "x": 0,
+      "y": 0,
+      "width": 724,
+      "height": 724
+    },
+    {
+      "name": "pose-2",
+      "x": 724,
+      "y": 0,
+      "width": 724,
+      "height": 724
+    },
+    {
+      "name": "pose-3",
+      "x": 1448,
+      "y": 0,
+      "width": 724,
+      "height": 724
+    }
+  ],
+  "animation": {
+    "configured": false,
+    "note": "Three illustrated poses; not yet verified as a seamless walking cycle."
+  }
+}

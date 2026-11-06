@@ -206,17 +206,19 @@ document.getElementById('platformMode').onclick=()=>{mode='platform';frame=0};
 // Uniform frame dimensions and ground registration for every motion.
 // Each strip is transparent, horizontally arranged, and retains the
 // exact original pose rendering from the workshop.
+const spriteKinds=['walk','run','jump','gap','platform'];
 function spriteSheet(kind){
  const oldMode=mode,oldFrame=frame,oldPlaying=playing;
- const count=(kind==='walk'||kind==='run')?8:12;
- const tileW=288,tileH=224,sheet=document.createElement('canvas');
+ const tileW=192,tileH=192,count=(kind==='walk'||kind==='run')?8:12;
+ const sheet=document.createElement('canvas');
  sheet.width=tileW*count;sheet.height=tileH;
  const ctx=sheet.getContext('2d');
  try{
   exporting=true;mode=kind;playing=false;
   for(let i=0;i<count;i++){
    frame=i;draw();
-   ctx.drawImage(c,176,40,tileW,tileH,i*tileW,0,tileW,tileH);
+   // World x 224..416, y 95..287. Identical ground baseline across frames.
+   ctx.drawImage(c,224,95,tileW,tileH,i*tileW,0,tileW,tileH);
   }
  }finally{
   exporting=false;mode=oldMode;frame=oldFrame;playing=oldPlaying;draw();
@@ -236,10 +238,8 @@ document.getElementById('exportJump').onclick=()=>downloadSprite('jump');
 document.getElementById('exportGap').onclick=()=>downloadSprite('gap');
 document.getElementById('exportPlatform').onclick=()=>downloadSprite('platform');
 document.getElementById('exportBoth').onclick=()=>{
- // Browsers may require permission to allow five downloads.
- for(const [i,kind] of ['walk','run','jump','gap','platform'].entries()){
-  setTimeout(()=>downloadSprite(kind),i*450);
- }
+ // Browser may request permission to download multiple files.
+ spriteKinds.forEach((kind,i)=>setTimeout(()=>downloadSprite(kind),i*450));
 };
 speed.oninput=()=>document.getElementById('fps').textContent=speed.value;requestAnimationFrame(tick);
 </script></body></html>

@@ -1,4 +1,4 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Dooms Day · Animation Workshop</title><style>*{box-sizing:border-box}body{margin:0;background:#101722;color:#f0e2c4;font:16px system-ui;padding:20px}main{max-width:760px;margin:auto}h1{font:28px Georgia}canvas{width:100%;max-width:640px;background:#1b2934;image-rendering:pixelated;border:1px solid #536272;border-radius:10px}button,input{accent-color:#e6b86d}button{background:#36485b;color:white;border:1px solid #8293a1;border-radius:8px;padding:10px 15px;margin:5px}label{display:block;margin:15px 0}.note{color:#aebdcc}a{color:#e6b86d}</style></head><body><main><h1>Protagonist · Motion Rig V42</h1><p id="build" class="note"><strong>VERSION 42 · CREATED 2026-11-06T00:47:16.439Z UTC</strong><br>Fixed at publication, not the time you open the page.</p><p class="note">Walk and jump studies · frame-by-frame pose inspection. This is the movement foundation, not finished artwork.</p><canvas id="stage" width="640" height="320"></canvas><div><button id="walkMode">Walk</button><button id="runMode">Run</button><button id="jumpMode">A · Vertical</button><button id="gapMode">B · Gap</button><button id="platformMode">C · Platform</button></div><div><button id="play">Pause</button><button id="step">Next frame</button><button id="reset">Reset</button><button id="exportWalk">Download Walk PNG</button><button id="exportRun">Download Run PNG</button><button id="exportJump">Download Jump A PNG</button><button id="exportGap">Download Jump B PNG</button><button id="exportPlatform">Download Jump C PNG</button><button id="exportBoth">Download All PNGs</button></div><label>Animation speed <input id="speed" type="range" min="2" max="16" value="8"> <span id="fps">8</span> frames/sec</label><label>Stride length <input id="stride" type="range" min="30" max="42" value="39"></label><p id="info" aria-live="polite"></p><p class="note">Rig landmarks: head, neck, shoulders, elbows, hands, pelvis, knees, ankles. Side view; opposite limbs are tinted blue. Use the frame-step control to inspect contact and passing poses.</p><p><a href="../">Return to game</a></p></main><script>
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Dooms Day · Animation Workshop</title><style>*{box-sizing:border-box}body{margin:0;background:#101722;color:#f0e2c4;font:16px system-ui;padding:20px}main{max-width:760px;margin:auto}h1{font:28px Georgia}canvas{width:100%;max-width:640px;background:#1b2934;image-rendering:pixelated;border:1px solid #536272;border-radius:10px}button,input{accent-color:#e6b86d}button{background:#36485b;color:white;border:1px solid #8293a1;border-radius:8px;padding:10px 15px;margin:5px}label{display:block;margin:15px 0}.note{color:#aebdcc}a{color:#e6b86d}</style></head><body><main><h1>Protagonist · Motion Rig V43</h1><p id="build" class="note"><strong>VERSION 42 · CREATED 2026-11-06T00:47:16.439Z UTC</strong><br>Fixed at publication, not the time you open the page.</p><p class="note">Walk and jump studies · frame-by-frame pose inspection. This is the movement foundation, not finished artwork.</p><canvas id="stage" width="640" height="320"></canvas><div><button id="walkMode">Walk</button><button id="runMode">Run</button><button id="jumpMode">A · Vertical</button><button id="gapMode">B · Gap</button><button id="platformMode">C · Platform</button></div><div><button id="play">Pause</button><button id="step">Next frame</button><button id="reset">Reset</button><button id="exportWalk">Download Walk PNG</button><button id="exportRun">Download Run PNG</button><button id="exportJump">Download Jump A PNG</button><button id="exportGap">Download Jump B PNG</button><button id="exportPlatform">Download Jump C PNG</button><button id="exportBoth">Download All PNGs</button></div><label>Animation speed <input id="speed" type="range" min="2" max="16" value="8"> <span id="fps">8</span> frames/sec</label><label>Stride length <input id="stride" type="range" min="30" max="42" value="39"></label><p id="info" aria-live="polite"></p><p class="note">Rig landmarks: head, neck, shoulders, elbows, hands, pelvis, knees, ankles. Side view; opposite limbs are tinted blue. Use the frame-step control to inspect contact and passing poses.</p><p><a href="../">Return to game</a></p></main><script>
 const c=document.getElementById('stage'),g=c.getContext('2d'),speed=document.getElementById('speed'),stride=document.getElementById('stride'),info=document.getElementById('info');let frame=0,playing=true,last=0,mode="walk",exporting=false;
 const colors={near:'#eac18a',far:'#80a9b7',body:'#d5d4c9'};
 function line(a,b,col,w=5){g.strokeStyle=col;g.lineWidth=w;g.lineCap='round';g.beginPath();g.moveTo(...a);g.lineTo(...b);g.stroke()}
@@ -86,7 +86,57 @@ function lanternArm(shoulder,phase,running=false){
  g.strokeStyle='#4b3d31';g.lineWidth=2;g.strokeRect(center[0]-7,center[1]-8,14,17);
 }
 function jumpLimb(a,b,c,color,w){line(a,b,color,w);line(b,c,color,w);dot(b,color,3);dot(c,color,3)}
+function platformJumpDraw(ground){
+ const idx=frame%12, floor=ground-45;
+ // Two-foot box jump: loading, toe-off, flight, synchronized contact,
+ // shock absorption and standing recovery. Both bones stay 36px long.
+ const rise=[0,0,0,4,25,54,76,79,68,45,45,45][idx];
+ const squat=[0,10,19,10,0,0,0,0,0,13,8,0][idx];
+ const cx=290+[0,0,0,2,10,22,34,45,54,64,64,64][idx];
+ const hip=[cx,ground-68-rise+squat];
+ const shoulder=[cx+2,hip[1]-51],neck=[cx+2,shoulder[1]-7],head=[cx+2,neck[1]-16];
+ const thigh=36,shin=36;
+ // Forward knees with the feet always below and slightly forward of the hips.
+ const footX=[10,13,17,14,5,10,17,19,17,14,12,10][idx];
+ const footY=idx<=2?ground-5:idx===3?ground-9:idx===4?ground-19:
+             idx===5?ground-43:idx===6?ground-65:idx===7?ground-70:
+             idx===8?floor-17:floor-5;
+ const labels=['READY','LOAD','DEEP LOAD','DRIVE','TOE OFF','ASCEND','TUCK','APEX','EXTEND','TWO-FOOT CONTACT','ABSORB','STAND'];
+ function kneeAt(H,A){
+  let dx=A[0]-H[0],dy=A[1]-H[1],d=Math.hypot(dx,dy);
+  if(d>71.999){dx*=71.999/d;dy*=71.999/d;d=71.999;}
+  if(d<.001){dx=0;dy=.001;d=.001;}
+  const mid=[H[0]+dx*.5,H[1]+dy*.5];
+  const h=Math.sqrt(Math.max(0,thigh*thigh-d*d/4));
+  // Perpendicular pointing toward screen-right, so the knee never folds backward.
+  return [mid[0]+dy/d*h,mid[1]-dx/d*h];
+ }
+ for(const near of [false,true]){
+  const offset=near?3:-3,col=near?colors.near:colors.far;
+  const H=[hip[0]+offset,hip[1]];
+  let A=[H[0]+footX+(near?2:-2),footY];
+  let dx=A[0]-H[0],dy=A[1]-H[1],dist=Math.hypot(dx,dy);
+  if(dist>71.999){A=[H[0]+dx/dist*71.999,H[1]+dy/dist*71.999];}
+  const K=kneeAt(H,A);
+  jumpLimb(H,K,A,col,6);
+  const toe=[A[0]+14,A[1]+(idx===4?5:idx>=9?5:1)];
+  line(A,toe,col,5);
+  // Keep both arms balanced and close to the torso during the landing.
+  const elbow=[shoulder[0]+offset+19,shoulder[1]+20];
+  const hand=[elbow[0]+12,elbow[1]+12];
+  jumpLimb(shoulder,elbow,hand,col,5);
+ }
+ line(hip,shoulder,colors.body,9);line(shoulder,neck,colors.body,5);
+ dot(head,'#edc59c',13);
+ line([head[0]-13,head[1]-8],[head[0]+12,head[1]-8],'#98734e',5);
+ dot([head[0]+12,head[1]+2],'#edc59c',3);
+ dot(hip,'#efc88d',5);dot(shoulder,'#efc88d',5);
+ if(!exporting){g.fillStyle='#526f63';g.fillRect(355,floor,240,9);
+ g.fillStyle='#30483f';g.fillRect(355,floor+9,240,36);}
+ return labels[idx];
+}
 function jumpDraw(ground){
+ if(mode==='platform')return platformJumpDraw(ground);
  const idx=frame%12,platform=mode==='platform',gap=mode==='gap';
  const rise=(platform?[0,0,0,12,41,70,84,76,57,45,45,45]:gap?[0,0,0,8,26,43,49,43,28,10,0,0]:[0,0,0,9,34,57,70,62,38,9,0,0])[idx];
  const depth=(gap?[4,12,24,14,0,0,0,0,0,12,24,8]:[4,10,14,8,0,0,0,0,0,9,22,7])[idx];
@@ -189,11 +239,11 @@ function runDraw(ground){
  return ['STRIKE','LOAD','PUSH','TOE-OFF','FLIGHT','RECOVER','REACH','EXTEND'][p];
 }
 function draw(){g.clearRect(0,0,640,320);if(!exporting){g.fillStyle='#1b2934';g.fillRect(0,0,640,320);}const ground=256;if(!exporting){g.strokeStyle='#607a70';g.lineWidth=2;g.beginPath();g.moveTo(0,ground);g.lineTo(640,ground);g.stroke();for(let x=0;x<640;x+=32){g.fillStyle='#324b50';g.fillRect(x,ground+3,16,3)}}
-if(mode==="run"){const label=runDraw(ground);if(!exporting){g.fillStyle='#f1ddaf';g.font='16px monospace';g.fillText('V42 · RUN STUDY',20,30);g.fillText('FRAME '+(frame+1)+'/8',20,78);g.fillText(label,20,100);info.textContent='Run · '+label+' · frame '+(frame+1)+'/8';}return;}
-if(mode!=="walk"){const label=jumpDraw(ground);if(!exporting){g.fillStyle='#f1ddaf';g.font='16px monospace';g.fillText('V42 · CREATED 2026-11-06 00:26 UTC',20,30);g.fillText('FRAME '+(frame+1)+'/12',20,78);g.fillText(label,20,100);g.fillText('GROUND',20,ground-10);info.textContent='Jump · frame '+(frame+1)+' of 12 · '+label+' · '+(playing?'Playing':'Paused');}return;}
+if(mode==="run"){const label=runDraw(ground);if(!exporting){g.fillStyle='#f1ddaf';g.font='16px monospace';g.fillText('V43 · RUN STUDY',20,30);g.fillText('FRAME '+(frame+1)+'/8',20,78);g.fillText(label,20,100);info.textContent='Run · '+label+' · frame '+(frame+1)+'/8';}return;}
+if(mode!=="walk"){const label=jumpDraw(ground);if(!exporting){g.fillStyle='#f1ddaf';g.font='16px monospace';g.fillText('V43 · CREATED 2026-11-06 00:26 UTC',20,30);g.fillText('FRAME '+(frame+1)+'/12',20,78);g.fillText(label,20,100);g.fillText('GROUND',20,ground-10);info.textContent='Jump · frame '+(frame+1)+' of 12 · '+label+' · '+(playing?'Playing':'Paused');}return;}
 const phase=frame*Math.PI/4,step=Number(stride.value),bob=Math.abs(Math.sin(phase))*2,center=320,hip=[center,ground-66.7+bob*.3],shoulder=[center+2,hip[1]-51],neck=[center+2,shoulder[1]-7],head=[center+2,neck[1]-16];
 const rearFoot=leg(hip,phase+Math.PI,false,step,ground);arm(shoulder,phase+Math.PI,false);line(hip,shoulder,colors.body,9);line(shoulder,neck,colors.body,5);dot(head,'#edc59c',13);line([head[0]-13,head[1]-8],[head[0]+12,head[1]-8],'#98734e',5);const nearFoot=leg(hip,phase,true,step,ground);lanternArm(shoulder,phase);dot(hip,'#efc88d',5);dot(shoulder,'#efc88d',5);
-if(!exporting){g.fillStyle='#f1ddaf';g.font='16px monospace';g.fillText('V42 · CREATED 2026-11-06 00:26 UTC',20,30);g.fillText('FRAME '+(frame+1)+'/8',20,78);g.fillText(['CONTACT','PUSH','PASS','SWING','CONTACT','PUSH','PASS','SWING'][frame],20,100);g.fillText('GROUND',20,ground-10);info.textContent='Frame '+(frame+1)+' of 8 · '+(playing?'Playing':'Paused')+' · stride '+step+' px'}}
+if(!exporting){g.fillStyle='#f1ddaf';g.font='16px monospace';g.fillText('V43 · CREATED 2026-11-06 00:26 UTC',20,30);g.fillText('FRAME '+(frame+1)+'/8',20,78);g.fillText(['CONTACT','PUSH','PASS','SWING','CONTACT','PUSH','PASS','SWING'][frame],20,100);g.fillText('GROUND',20,ground-10);info.textContent='Frame '+(frame+1)+' of 8 · '+(playing?'Playing':'Paused')+' · stride '+step+' px'}}
 function tick(t){if(playing&&t-last>=1000/Number(speed.value)){frame=(frame+1)%((mode==='walk'||mode==='run')?8:12);last=t}draw();requestAnimationFrame(tick)}
 document.getElementById('play').onclick=e=>{playing=!playing;e.target.textContent=playing?'Pause':'Play'};document.getElementById('step').onclick=()=>{playing=false;document.getElementById('play').textContent='Play';frame=(frame+1)%((mode==='walk'||mode==='run')?8:12)};document.getElementById('reset').onclick=()=>{frame=0;playing=true;document.getElementById('play').textContent='Pause'};document.getElementById('walkMode').onclick=()=>{mode='walk';frame=0};
 document.getElementById('runMode').onclick=()=>{mode='run';frame=0};
@@ -228,7 +278,7 @@ function spriteSheet(kind){
 function downloadSprite(kind){
  const sheet=spriteSheet(kind);
  const a=document.createElement('a');
- a.download='dooms-day-'+kind+'-v42.png';
+ a.download='dooms-day-'+kind+'-v43.png';
  a.href=sheet.toDataURL('image/png');
  document.body.appendChild(a);a.click();a.remove();
 }

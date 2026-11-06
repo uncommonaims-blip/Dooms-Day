@@ -1,11 +1,11 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Dooms Day · Animation Workshop</title><style>*{box-sizing:border-box}body{margin:0;background:#101722;color:#f0e2c4;font:16px system-ui;padding:20px}main{max-width:760px;margin:auto}h1{font:28px Georgia}canvas{width:100%;max-width:640px;background:#1b2934;image-rendering:pixelated;border:1px solid #536272;border-radius:10px}button,input{accent-color:#e6b86d}button{background:#36485b;color:white;border:1px solid #8293a1;border-radius:8px;padding:10px 15px;margin:5px}label{display:block;margin:15px 0}.note{color:#aebdcc}a{color:#e6b86d}</style></head><body><main><h1>Protagonist · Motion Rig V41</h1><p id="build" class="note"><strong>VERSION 41 · CREATED 2026-11-06T00:44:24.569Z UTC</strong><br>Fixed at publication, not the time you open the page.</p><p class="note">Walk and jump studies · frame-by-frame pose inspection. This is the movement foundation, not finished artwork.</p><canvas id="stage" width="640" height="320"></canvas><div><button id="walkMode">Walk</button><button id="runMode">Run</button><button id="jumpMode">A · Vertical</button><button id="gapMode">B · Gap</button><button id="platformMode">C · Platform</button></div><div><button id="play">Pause</button><button id="step">Next frame</button><button id="reset">Reset</button><button id="exportWalk">Download Walk PNG</button><button id="exportRun">Download Run PNG</button><button id="exportJump">Download Jump A PNG</button><button id="exportGap">Download Jump B PNG</button><button id="exportPlatform">Download Jump C PNG</button><button id="exportBoth">Download All PNGs</button></div><label>Animation speed <input id="speed" type="range" min="2" max="16" value="8"> <span id="fps">8</span> frames/sec</label><label>Stride length <input id="stride" type="range" min="30" max="42" value="39"></label><p id="info" aria-live="polite"></p><p class="note">Rig landmarks: head, neck, shoulders, elbows, hands, pelvis, knees, ankles. Side view; opposite limbs are tinted blue. Use the frame-step control to inspect contact and passing poses.</p><p><a href="../">Return to game</a></p></main><script>
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Dooms Day · Animation Workshop</title><style>*{box-sizing:border-box}body{margin:0;background:#101722;color:#f0e2c4;font:16px system-ui;padding:20px}main{max-width:760px;margin:auto}h1{font:28px Georgia}canvas{width:100%;max-width:640px;background:#1b2934;image-rendering:pixelated;border:1px solid #536272;border-radius:10px}button,input{accent-color:#e6b86d}button{background:#36485b;color:white;border:1px solid #8293a1;border-radius:8px;padding:10px 15px;margin:5px}label{display:block;margin:15px 0}.note{color:#aebdcc}a{color:#e6b86d}</style></head><body><main><h1>Protagonist · Motion Rig V42</h1><p id="build" class="note"><strong>VERSION 42 · CREATED 2026-11-06T00:47:16.439Z UTC</strong><br>Fixed at publication, not the time you open the page.</p><p class="note">Walk and jump studies · frame-by-frame pose inspection. This is the movement foundation, not finished artwork.</p><canvas id="stage" width="640" height="320"></canvas><div><button id="walkMode">Walk</button><button id="runMode">Run</button><button id="jumpMode">A · Vertical</button><button id="gapMode">B · Gap</button><button id="platformMode">C · Platform</button></div><div><button id="play">Pause</button><button id="step">Next frame</button><button id="reset">Reset</button><button id="exportWalk">Download Walk PNG</button><button id="exportRun">Download Run PNG</button><button id="exportJump">Download Jump A PNG</button><button id="exportGap">Download Jump B PNG</button><button id="exportPlatform">Download Jump C PNG</button><button id="exportBoth">Download All PNGs</button></div><label>Animation speed <input id="speed" type="range" min="2" max="16" value="8"> <span id="fps">8</span> frames/sec</label><label>Stride length <input id="stride" type="range" min="30" max="42" value="39"></label><p id="info" aria-live="polite"></p><p class="note">Rig landmarks: head, neck, shoulders, elbows, hands, pelvis, knees, ankles. Side view; opposite limbs are tinted blue. Use the frame-step control to inspect contact and passing poses.</p><p><a href="../">Return to game</a></p></main><script>
 const c=document.getElementById('stage'),g=c.getContext('2d'),speed=document.getElementById('speed'),stride=document.getElementById('stride'),info=document.getElementById('info');let frame=0,playing=true,last=0,mode="walk",exporting=false;
 const colors={near:'#eac18a',far:'#80a9b7',body:'#d5d4c9'};
 function line(a,b,col,w=5){g.strokeStyle=col;g.lineWidth=w;g.lineCap='round';g.beginPath();g.moveTo(...a);g.lineTo(...b);g.stroke()}
 function dot(a,col,r=4){g.fillStyle=col;g.beginPath();g.arc(...a,r,0,Math.PI*2);g.fill()}
 function solveKnee(hip,ankle,upper=39,lower=38){const dx=ankle[0]-hip[0],dy=ankle[1]-hip[1],d=Math.max(.01,Math.min(upper+lower-.01,Math.hypot(dx,dy))),along=(upper*upper-lower*lower+d*d)/(2*d),height=Math.sqrt(Math.max(0,upper*upper-along*along)),ux=dx/d,uy=dy/d;return [hip[0]+ux*along+uy*height,hip[1]+uy*along-ux*height]}
 function leg(hip,phase,front,strideLength,ground){
-// 0 heel strike, .12 foot flat, .43 heel rise, .60 toe off,
+// 0 heel strike, .12 foot flat, .43 heel rise, .60 toe off; longer rearward extension,
 // .78 knee-led swing, 1.0 forward extension into next heel strike.
 const cycle=((phase/(Math.PI*2))%1+1)%1;
 const smooth=t=>{t=Math.max(0,Math.min(1,t));return t*t*(3-2*t)};
@@ -16,14 +16,14 @@ if(cycle<.12){
 const t=smooth(cycle/.12),x=lerp(forward,forward*.75+hip[0]*.25,t);
 heel=[x,ground];toe=[x+13,ground-11*(1-t)];ankle=[x,ground-4*t];
 }else if(cycle<.43){
-const t=smooth((cycle-.12)/.31),x=lerp(forward*.75+hip[0]*.25,hip[0]-strideLength*.50,t);
+const t=smooth((cycle-.12)/.31),x=lerp(forward*.75+hip[0]*.25,hip[0]-strideLength*.90,t);
 heel=[x,ground];toe=[x+13,ground];ankle=[x+2,ground-5];
 }else if(cycle<.60){
 const t=smooth((cycle-.43)/.17);
 // The ball/toe is the stationary pivot during terminal stance.
 // Previously x moved backward here, making the toe slide and the
 // heel appear to drive propulsion.
-const toeAnchor=hip[0]-strideLength*.50+13;
+const toeAnchor=hip[0]-strideLength*.90+13;
 const roll=smooth(t);
 toe=[toeAnchor,ground];
 heel=[toeAnchor-13*(1-roll),ground-15*roll];
@@ -33,7 +33,7 @@ const t=(cycle-.60)/.40,lead=smooth(t);
 // Recovery begins at the rear toe-off position. The foot rotates
 // continuously: toes down at the back, level under the hip,
 // toes up ahead of the hip in preparation for heel strike.
-const toeAnchor=hip[0]-strideLength*.50+13;
+const toeAnchor=hip[0]-strideLength*.90+13;
 const x=lerp(toeAnchor,forward,lead);
 // Low clearance on recovery: avoid pulling the ankle close to the hip,
 // which makes an exact-length knee rise unnaturally high.
@@ -47,7 +47,7 @@ toe=[heel[0]+15*Math.cos(footAngle),heel[1]+15*Math.sin(footAngle)];
 }
 const color=front?colors.near:colors.far;
 // Explicitly straighten at initial heel contact and terminal toe propulsion.
-const fullExtension=cycle<.001 || (cycle>=.50 && cycle<=.60);
+const fullExtension=cycle<.001 || (cycle>=.54 && cycle<=.60);
 let knee=fullExtension ? [(hip[0]+ankle[0])/2,(hip[1]+ankle[1])/2] : solveKnee(hip,ankle,39,38);
 // Keep the knee on the exact intersection of the thigh/shin circles.
 // Moving the knee independently during recovery used to shrink the shin
@@ -189,11 +189,11 @@ function runDraw(ground){
  return ['STRIKE','LOAD','PUSH','TOE-OFF','FLIGHT','RECOVER','REACH','EXTEND'][p];
 }
 function draw(){g.clearRect(0,0,640,320);if(!exporting){g.fillStyle='#1b2934';g.fillRect(0,0,640,320);}const ground=256;if(!exporting){g.strokeStyle='#607a70';g.lineWidth=2;g.beginPath();g.moveTo(0,ground);g.lineTo(640,ground);g.stroke();for(let x=0;x<640;x+=32){g.fillStyle='#324b50';g.fillRect(x,ground+3,16,3)}}
-if(mode==="run"){const label=runDraw(ground);if(!exporting){g.fillStyle='#f1ddaf';g.font='16px monospace';g.fillText('V41 · RUN STUDY',20,30);g.fillText('FRAME '+(frame+1)+'/8',20,78);g.fillText(label,20,100);info.textContent='Run · '+label+' · frame '+(frame+1)+'/8';}return;}
-if(mode!=="walk"){const label=jumpDraw(ground);if(!exporting){g.fillStyle='#f1ddaf';g.font='16px monospace';g.fillText('V41 · CREATED 2026-11-06 00:26 UTC',20,30);g.fillText('FRAME '+(frame+1)+'/12',20,78);g.fillText(label,20,100);g.fillText('GROUND',20,ground-10);info.textContent='Jump · frame '+(frame+1)+' of 12 · '+label+' · '+(playing?'Playing':'Paused');}return;}
+if(mode==="run"){const label=runDraw(ground);if(!exporting){g.fillStyle='#f1ddaf';g.font='16px monospace';g.fillText('V42 · RUN STUDY',20,30);g.fillText('FRAME '+(frame+1)+'/8',20,78);g.fillText(label,20,100);info.textContent='Run · '+label+' · frame '+(frame+1)+'/8';}return;}
+if(mode!=="walk"){const label=jumpDraw(ground);if(!exporting){g.fillStyle='#f1ddaf';g.font='16px monospace';g.fillText('V42 · CREATED 2026-11-06 00:26 UTC',20,30);g.fillText('FRAME '+(frame+1)+'/12',20,78);g.fillText(label,20,100);g.fillText('GROUND',20,ground-10);info.textContent='Jump · frame '+(frame+1)+' of 12 · '+label+' · '+(playing?'Playing':'Paused');}return;}
 const phase=frame*Math.PI/4,step=Number(stride.value),bob=Math.abs(Math.sin(phase))*2,center=320,hip=[center,ground-66.7+bob*.3],shoulder=[center+2,hip[1]-51],neck=[center+2,shoulder[1]-7],head=[center+2,neck[1]-16];
 const rearFoot=leg(hip,phase+Math.PI,false,step,ground);arm(shoulder,phase+Math.PI,false);line(hip,shoulder,colors.body,9);line(shoulder,neck,colors.body,5);dot(head,'#edc59c',13);line([head[0]-13,head[1]-8],[head[0]+12,head[1]-8],'#98734e',5);const nearFoot=leg(hip,phase,true,step,ground);lanternArm(shoulder,phase);dot(hip,'#efc88d',5);dot(shoulder,'#efc88d',5);
-if(!exporting){g.fillStyle='#f1ddaf';g.font='16px monospace';g.fillText('V41 · CREATED 2026-11-06 00:26 UTC',20,30);g.fillText('FRAME '+(frame+1)+'/8',20,78);g.fillText(['CONTACT','PUSH','PASS','SWING','CONTACT','PUSH','PASS','SWING'][frame],20,100);g.fillText('GROUND',20,ground-10);info.textContent='Frame '+(frame+1)+' of 8 · '+(playing?'Playing':'Paused')+' · stride '+step+' px'}}
+if(!exporting){g.fillStyle='#f1ddaf';g.font='16px monospace';g.fillText('V42 · CREATED 2026-11-06 00:26 UTC',20,30);g.fillText('FRAME '+(frame+1)+'/8',20,78);g.fillText(['CONTACT','PUSH','PASS','SWING','CONTACT','PUSH','PASS','SWING'][frame],20,100);g.fillText('GROUND',20,ground-10);info.textContent='Frame '+(frame+1)+' of 8 · '+(playing?'Playing':'Paused')+' · stride '+step+' px'}}
 function tick(t){if(playing&&t-last>=1000/Number(speed.value)){frame=(frame+1)%((mode==='walk'||mode==='run')?8:12);last=t}draw();requestAnimationFrame(tick)}
 document.getElementById('play').onclick=e=>{playing=!playing;e.target.textContent=playing?'Pause':'Play'};document.getElementById('step').onclick=()=>{playing=false;document.getElementById('play').textContent='Play';frame=(frame+1)%((mode==='walk'||mode==='run')?8:12)};document.getElementById('reset').onclick=()=>{frame=0;playing=true;document.getElementById('play').textContent='Pause'};document.getElementById('walkMode').onclick=()=>{mode='walk';frame=0};
 document.getElementById('runMode').onclick=()=>{mode='run';frame=0};
@@ -228,7 +228,7 @@ function spriteSheet(kind){
 function downloadSprite(kind){
  const sheet=spriteSheet(kind);
  const a=document.createElement('a');
- a.download='dooms-day-'+kind+'-v41.png';
+ a.download='dooms-day-'+kind+'-v42.png';
  a.href=sheet.toDataURL('image/png');
  document.body.appendChild(a);a.click();a.remove();
 }

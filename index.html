@@ -51,18 +51,37 @@ function caveBackdrop(r){
 }
 function caveTerrain(r){
  const ground=groundY(r);
- // Large illustrated rock sections replace the old grey rectangle scenery.
  const startX=Math.max(0,Math.floor(cam/64)*64-64),endX=Math.min(r.w*T,cam+W+96);
- for(let x=startX;x<endX;x+=64){caveTile((Math.floor(x/64)%3),x,ground-15,66,80);caveTile(8+(Math.floor(x/64)%4),x,ground+48,66,72)}
- for(const [tx,ty,tw] of r.platforms){const x=tx*T,y=ty*T,w=tw*T;for(let j=0;j<w;j+=48)caveTile(j===0?2:j+48>=w?4:3,x+j,y-19,Math.min(49,w-j),45)}
- for(const [tx,ty,tw] of r.walls){const x=tx*T,y=ty*T,w=tw*T;for(let j=0;j<w;j+=48){caveTile(j===0?9:10,x+j,y-12,Math.min(49,w-j),ground-y+20)}}
- // Foreground formations are visual decorations; collision geometry remains unchanged.
+ // Continuous collision-aligned stone underlay: no open seams between decorative atlas sprites.
+ g.fillStyle='#24262b';g.fillRect(startX,ground,endX-startX,Math.max(H-ground,120));
+ g.fillStyle='#42403b';g.fillRect(startX,ground-5,endX-startX,9);
+ g.fillStyle='#62574a';g.fillRect(startX,ground-6,endX-startX,2);
+ // Art tiles overlap deliberately so transparent padding cannot expose a slit.
+ const step=56,overlap=12;
+ for(let x=Math.floor(startX/step)*step;x<endX;x+=step){
+  const n=Math.floor(x/step);
+  caveTile(((n%3)+3)%3,x-3,ground-16,step+overlap,83);
+  caveTile(8+((n%4)+4)%4,x-3,ground+48,step+overlap,72);
+ }
+ // Platforms use one continuous top and core, with illustrations layered over them.
+ for(const [tx,ty,tw] of r.platforms){
+  const x=tx*T,y=ty*T,w=tw*T;
+  g.fillStyle='#373630';g.fillRect(x,y,w,19);
+  g.fillStyle='#75634b';g.fillRect(x,y-3,w,5);
+  for(let j=0;j<w;j+=42)caveTile(j===0?2:j+42>=w?4:3,x+j-2,y-19,Math.min(50,w-j+4),45);
+ }
+ for(const [tx,ty,tw] of r.walls){
+  const x=tx*T,y=ty*T,w=tw*T;
+  g.fillStyle='#34343a';g.fillRect(x,y,w,Math.max(0,ground-y));
+  g.fillStyle='#75634b';g.fillRect(x,y-3,w,5);
+  for(let j=0;j<w;j+=42)caveTile(j===0?9:10,x+j-2,y-12,Math.min(50,w-j+4),ground-y+20);
+ }
  for(let i=Math.floor(startX/144);i<=Math.ceil(endX/144);i++){
- const x=i*144+43,choice=Math.abs(i)%4;
- if(choice===0)caveTile(16+(Math.abs(i)%3),x,-4,38,58);
- if(choice===1)caveTile(19+(Math.abs(i)%3),x,ground-47,38,48);
- if(choice===2)caveTile(22,x,ground-73,42,72);
- if(choice===3)caveTile(24+(Math.abs(i)%3),x,ground-29,35,30);
+  const x=i*144+43,choice=Math.abs(i)%4;
+  if(choice===0)caveTile(16+(Math.abs(i)%3),x,-4,38,58);
+  if(choice===1)caveTile(19+(Math.abs(i)%3),x,ground-47,38,48);
+  if(choice===2)caveTile(22,x,ground-73,42,72);
+  if(choice===3)caveTile(24+(Math.abs(i)%3),x,ground-29,35,30);
  }
 }
 const heroFrameBounds=[];
@@ -77,7 +96,7 @@ const W=480,H=270,T=16,rooms=[
 ];
 let level=0,cam=0,frame=0,keys={},stickInput={x:0,y:0},jumpHeld=false,last=0,toast='',toastUntil=0,ended=false;
 const p={x:5*T,y:100,vx:0,vy:0,w:10,h:16,facing:1,crouching:false,grounded:false,light:48,worms:0,balloon:0,lead:0,health:5,food:3,dog:false,bat:false,rescued:0,canary:100};
-const GAME_VERSION='0.63.0';
+const GAME_VERSION='0.64.0';
 const versionTag=document.createElement('div');
 versionTag.id='game-version';
 versionTag.textContent='DOOMS DAY · v'+GAME_VERSION;

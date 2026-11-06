@@ -26,7 +26,7 @@ function removeAtlasBackdrop(img){
  }
  ctx.putImageData(image,0,0);return cv;
 }
-function loadArt(key,url){const img=new Image();img.onload=()=>{try{art[key]=key==='cave'?removeAtlasBackdrop(img):img;assetStatus[key]='ready'}catch(e){console.warn('Atlas cleanup fallback',e);art[key]=img;assetStatus[key]='ready'}};img.onerror=()=>{assetStatus[key]='missing'};img.src=url}
+function loadArt(key,url){const img=new Image();img.onload=()=>{try{art[key]=key==='cave'?removeAtlasBackdrop(img):img;if(key==='hero')prepareHeroBounds(img);assetStatus[key]='ready'}catch(e){console.warn('Atlas cleanup fallback',e);art[key]=img;assetStatus[key]='ready'}};img.onerror=()=>{assetStatus[key]='missing'};img.src=url}
 loadArt('cave','assets/cave/cave-atlas.png');
 loadArt('hero','assets/characters/hero-walk.png');
 const soundtrack=new Audio();soundtrack.loop=true;soundtrack.volume=.35;
@@ -65,7 +65,9 @@ function caveTerrain(r){
  if(choice===3)caveTile(24+(Math.abs(i)%3),x,ground-29,35,30);
  }
 }
-function drawHero(){if(!art.hero)return false;const img=art.hero,fw=img.width/8,fh=img.height,walking=Math.abs(p.vx)>.15&&p.grounded,idx=walking?Math.floor(frame/7)%8:0;g.save();if(p.facing<0){g.translate(p.x+p.w/2,0);g.scale(-1,1);g.translate(-(p.x+p.w/2),0)}const height=p.crouching?61:112,width=height*.58;g.drawImage(img,idx*fw,0,fw,fh,p.x+p.w/2-width/2,p.y+p.h-height,width,height);g.restore();return true}
+const heroFrameBounds=[];
+function prepareHeroBounds(img){heroFrameBounds.length=0;const cw=img.width/8,cv=document.createElement('canvas');cv.width=img.width;cv.height=img.height;const cx=cv.getContext('2d',{willReadFrequently:true});cx.drawImage(img,0,0);const data=cx.getImageData(0,0,cv.width,cv.height).data;for(let f=0;f<8;f++){let left=Math.floor(f*cw),right=Math.floor((f+1)*cw),top=img.height,bottom=0,minX=right,maxX=left;for(let y=0;y<img.height;y+=2)for(let x=left;x<right;x+=2){let k=(y*img.width+x)*4;if(data[k+3]>90){minX=Math.min(minX,x);maxX=Math.max(maxX,x);top=Math.min(top,y);bottom=Math.max(bottom,y)}}heroFrameBounds.push(bottom>top?{x:Math.max(left,minX-2),y:Math.max(0,top-2),w:Math.min(right,maxX+3)-Math.max(left,minX-2),h:Math.min(img.height,bottom+3)-Math.max(0,top-2)}:{x:left,y:0,w:cw,h:img.height})}}
+function drawHero(){if(!art.hero)return false;const img=art.hero,walking=Math.abs(p.vx)>.15&&p.grounded,idx=walking?Math.floor(frame/7)%8:0,b=heroFrameBounds[idx]||{x:idx*img.width/8,y:0,w:img.width/8,h:img.height};g.save();if(p.facing<0){g.translate(p.x+p.w/2,0);g.scale(-1,1);g.translate(-(p.x+p.w/2),0)}const height=p.crouching?59:100,width=height*b.w/b.h;g.drawImage(img,b.x,b.y,b.w,b.h,p.x+p.w/2-width/2,p.y+p.h-height,width,height);g.restore();return true}
 const W=480,H=270,T=16,rooms=[
 {name:'The Forgotten Settlement',w:100,h:18,ground:14,theme:'#252a32',exit:92,entry:5,platforms:[[13,11,7],[28,9,8],[45,11,9],[66,8,10],[82,11,8]],walls:[[22,12,3],[54,12,4]],water:[],items:[['balloon',7,12],['gas',10,10],['worm',14,10],['food',18,10],['gas',32,8],['gas',47,9],['lead',63,13],['dog',74,7],['worm',87,10]],child:null},
 {name:'The Rootworks',w:110,h:20,ground:16,theme:'#1b3030',exit:101,entry:7,platforms:[[12,13,10],[32,10,8],[50,13,10],[72,9,12],[91,12,10]],walls:[[25,14,4],[63,14,4]],water:[[38,16,17]],items:[['worm',15,12],['bat',36,9],['food',55,12],['gas',75,8],['lead',93,15]],child:84},
@@ -75,7 +77,7 @@ const W=480,H=270,T=16,rooms=[
 ];
 let level=0,cam=0,frame=0,keys={},stickInput={x:0,y:0},jumpHeld=false,last=0,toast='',toastUntil=0,ended=false;
 const p={x:5*T,y:100,vx:0,vy:0,w:10,h:16,facing:1,crouching:false,grounded:false,light:48,worms:0,balloon:0,lead:0,health:5,food:3,dog:false,bat:false,rescued:0,canary:100};
-const GAME_VERSION='0.60.0';
+const GAME_VERSION='0.61.0';
 const versionTag=document.createElement('div');
 versionTag.id='game-version';
 versionTag.textContent='DOOMS DAY · v'+GAME_VERSION;
@@ -110,7 +112,7 @@ p.vy=-impulse-p.balloon*.18+p.lead*.24;p.grounded=false;
 if(water&&jump)p.vy-=.16;if(water&&down)p.vy+=.22+p.lead*.025;
 p.vy=Math.min(7,Math.max(-11,p.vy+gravity));
 moveAxis('x',p.vx,rects);p.grounded=false;moveAxis('y',p.vy,rects);p.x=Math.max(0,Math.min(r.w*T-p.w,p.x));
-if(p.y>H+groundY(r)){p.health=Math.max(1,p.health-1);resetPosition()}for(const item of r.items){if(item[3])continue;if(touchingPickup(item)){item[3]=true;switch(item[0]){case 'worm':p.worms++;p.light=Math.min(130,48+p.worms*14);say('A glowworm joins your lantern.');break;case 'food':p.food++;p.health=Math.min(5,p.health+1);say('You gather nourishing cave mushrooms.');break;case 'balloon':p.balloon++;say('You found the red balloon! Use Up + Jump to reach higher ledges.');break;case 'gas':if(p.balloon){p.balloon=Math.min(5,p.balloon+1);say('Blue lifting gas fills the balloon.')}else say('Strange blue gas drifts upward.');break;case 'lead':p.lead=Math.min(6,p.lead+1);say('You add lead ballast to your satchel.');break;case 'dog':p.dog=true;say('A lost terrier decides to follow you.');break;case 'bat':p.bat=true;say('A friendly bat reveals hidden contours.');break}}}
+if(p.y>H+groundY(r)){p.health=Math.max(1,p.health-1);resetPosition()}for(const item of r.items){if(item[3])continue;if(touchingPickup(item)){item[3]=true;switch(item[0]){case 'worm':p.worms++;p.light=Math.min(205,72+p.worms*22);say('A glowworm joins your lantern.');break;case 'food':p.food++;p.health=Math.min(5,p.health+1);say('You gather nourishing cave mushrooms.');break;case 'balloon':p.balloon++;say('You found the red balloon! Use Up + Jump to reach higher ledges.');break;case 'gas':if(p.balloon){p.balloon=Math.min(5,p.balloon+1);say('Blue lifting gas fills the balloon.')}else say('Strange blue gas drifts upward.');break;case 'lead':p.lead=Math.min(6,p.lead+1);say('You add lead ballast to your satchel.');break;case 'dog':p.dog=true;say('A lost terrier decides to follow you.');break;case 'bat':p.bat=true;say('A friendly bat reveals hidden contours.');break}}}
 if(r.child!==null&&!r.found&&Math.abs(p.x-r.child*T)<16){r.found=true;p.rescued++;say('You found a missing child! A rescue route is now marked.')}
 if(p.x>(r.exit*T-12)&&p.y>groundY(r)-85){advance()}
 if(frame%1100===0){p.canary=Math.max(0,p.canary-6);if(p.canary<30)say('The canary needs food. Press F to feed it.')}
@@ -137,7 +139,7 @@ rect(face>0?p.x+p.w+2:p.x-3,p.y+(p.crouching?4:8),2,3,'#fff0a4');
 if(p.balloon){let by=p.y-30-p.balloon*5;rect(p.x+2,by,9+p.balloon*2,12+p.balloon*2,'#c54d4c');rect(p.x+7,p.y-7,1,by+14+p.balloon*2-(p.y-7),'#ad9d83')}
 g.restore();
 const sx=p.x-cam+p.w/2,sy=p.y+p.h*.43;
-const lightRadius=Math.max(65,p.light||90);
+const lightRadius=Math.max(72,72+(p.worms||0)*22,p.light||0);
 // Overlay darkness using source-over; transparent center preserves the scene underneath.
 // Never use destination-out directly on the game canvas: that erases the artwork.
 const centerX=sx+p.facing*lightRadius*.12;

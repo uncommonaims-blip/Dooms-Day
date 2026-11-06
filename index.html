@@ -8,7 +8,7 @@ function loadArt(key,url){const img=new Image();img.onload=()=>{art[key]=img;ass
 loadArt('cave','assets/cave/cave-atlas.png');
 loadArt('hero','assets/characters/hero-walk.png');
 const soundtrack=new Audio();soundtrack.loop=true;soundtrack.volume=.35;
-const soundCandidates=['assets/sounds/doom-track1.mp3','assets/sounds/the%20doom-track1.mp3','assets/sounds/dooms-day.mp3','assets/sounds/soundtrack.mp3','assets/sounds/background-music.mp3'];
+const soundCandidates=['assets/sounds/Doom-track1.mp3'];
 let soundCandidate=0,soundReady=false;
 function trySound(){if(soundCandidate>=soundCandidates.length)return;soundtrack.src=soundCandidates[soundCandidate++];soundtrack.load()}
 soundtrack.addEventListener('canplay',()=>{soundReady=true},{once:true});
@@ -31,19 +31,19 @@ function caveTerrain(r){
  const ground=groundY(r);
  // Large illustrated rock sections replace the old grey rectangle scenery.
  const startX=Math.max(0,Math.floor(cam/64)*64-64),endX=Math.min(r.w*T,cam+W+96);
- for(let x=startX;x<endX;x+=64){caveTile((Math.floor(x/64)%3),x,ground-8,66,82);caveTile(8+(Math.floor(x/64)%4),x,ground+49,66,70)}
- for(const [tx,ty,tw] of r.platforms){const x=tx*T,y=ty*T,w=tw*T;for(let j=0;j<w;j+=48)caveTile(j===0?2:j+48>=w?4:3,x+j,y-15,Math.min(49,w-j),39)}
+ for(let x=startX;x<endX;x+=64){caveTile((Math.floor(x/64)%3),x,ground-15,66,80);caveTile(8+(Math.floor(x/64)%4),x,ground+48,66,72)}
+ for(const [tx,ty,tw] of r.platforms){const x=tx*T,y=ty*T,w=tw*T;for(let j=0;j<w;j+=48)caveTile(j===0?2:j+48>=w?4:3,x+j,y-19,Math.min(49,w-j),45)}
  for(const [tx,ty,tw] of r.walls){const x=tx*T,y=ty*T,w=tw*T;for(let j=0;j<w;j+=48){caveTile(j===0?9:10,x+j,y-12,Math.min(49,w-j),ground-y+20)}}
  // Foreground formations are visual decorations; collision geometry remains unchanged.
  for(let i=Math.floor(startX/144);i<=Math.ceil(endX/144);i++){
  const x=i*144+43,choice=Math.abs(i)%4;
- if(choice===0)caveTile(16+(Math.abs(i)%3),x,0,38,58);
- if(choice===1)caveTile(19+(Math.abs(i)%3),x,ground-41,38,48);
- if(choice===2)caveTile(22,x,ground-64,42,72);
- if(choice===3)caveTile(24+(Math.abs(i)%3),x,ground-24,35,30);
+ if(choice===0)caveTile(16+(Math.abs(i)%3),x,-4,38,58);
+ if(choice===1)caveTile(19+(Math.abs(i)%3),x,ground-47,38,48);
+ if(choice===2)caveTile(22,x,ground-73,42,72);
+ if(choice===3)caveTile(24+(Math.abs(i)%3),x,ground-29,35,30);
  }
 }
-function drawHero(){if(!art.hero)return false;const img=art.hero,fw=img.width/3,fh=img.height,walking=Math.abs(p.vx)>.15&&p.grounded,idx=walking?Math.floor(frame/9)%3:0;g.save();if(p.facing<0){g.translate(p.x+p.w/2,0);g.scale(-1,1);g.translate(-(p.x+p.w/2),0)}const height=p.crouching?25:41,width=height*.93;g.drawImage(img,idx*fw,0,fw,fh,p.x+p.w/2-width/2,p.y+p.h-height,width,height);g.restore();return true}
+function drawHero(){if(!art.hero)return false;const img=art.hero,fw=img.width/3,fh=img.height,walking=Math.abs(p.vx)>.15&&p.grounded,idx=walking?Math.floor(frame/9)%3:0;g.save();if(p.facing<0){g.translate(p.x+p.w/2,0);g.scale(-1,1);g.translate(-(p.x+p.w/2),0)}const height=p.crouching?37:68,width=height*.85;g.drawImage(img,idx*fw,0,fw,fh,p.x+p.w/2-width/2,p.y+p.h-height,width,height);g.restore();return true}
 const W=480,H=270,T=16,rooms=[
 {name:'The Forgotten Settlement',w:100,h:18,ground:14,theme:'#252a32',exit:92,entry:5,platforms:[[13,11,7],[28,9,8],[45,11,9],[66,8,10],[82,11,8]],walls:[[22,12,3],[54,12,4]],water:[],items:[['balloon',7,12],['gas',10,10],['worm',14,10],['food',18,10],['gas',32,8],['gas',47,9],['lead',63,13],['dog',74,7],['worm',87,10]],child:null},
 {name:'The Rootworks',w:110,h:20,ground:16,theme:'#1b3030',exit:101,entry:7,platforms:[[12,13,10],[32,10,8],[50,13,10],[72,9,12],[91,12,10]],walls:[[25,14,4],[63,14,4]],water:[[38,16,17]],items:[['worm',15,12],['bat',36,9],['food',55,12],['gas',75,8],['lead',93,15]],child:84},

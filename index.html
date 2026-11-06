@@ -17,8 +17,33 @@ trySound();
 const musicButton=document.createElement('button');musicButton.type='button';musicButton.title='Toggle soundtrack';musicButton.setAttribute('aria-label','Toggle soundtrack');musicButton.textContent='♫';musicButton.style.cssText='position:fixed;top:86px;right:12px;z-index:7;width:44px;height:44px;padding:0;font-size:24px';
 document.body.appendChild(musicButton);
 musicButton.addEventListener('click',()=>{if(soundtrack.paused){soundtrack.play().then(()=>musicButton.style.opacity='1').catch(()=>say('Soundtrack not found. Check MP3 filename in assets/sounds.'))}else{soundtrack.pause();musicButton.style.opacity='.55'}});
-function caveTile(index,x,y,w,h){if(!art.cave)return false;const img=art.cave,cols=8,rows=6,cw=img.width/cols,ch=img.height/rows,inset=7;const sx=(index%cols)*cw+inset,sy=Math.floor(index/cols)*ch+inset;g.drawImage(img,sx,sy,cw-inset*2,ch-inset*2,x,y,w,h);return true}
-function drawHero(){if(!art.hero)return false;const img=art.hero,fw=img.width/3,fh=img.height,walking=Math.abs(p.vx)>.15&&p.grounded,idx=walking?Math.floor(frame/10)%3:0;g.save();if(p.facing<0){g.translate(p.x+p.w/2,0);g.scale(-1,1);g.translate(-(p.x+p.w/2),0)}const height=p.crouching?20:30,width=height*.86;g.drawImage(img,idx*fw,0,fw,fh,p.x+p.w/2-width/2,p.y+p.h-height,width,height);g.restore();return true}
+function caveTile(index,x,y,w,h){if(!art.cave)return false;const img=art.cave,cols=8,rows=6,cw=img.width/cols,ch=img.height/rows,inset=9;const sx=(index%cols)*cw+inset,sy=Math.floor(index/cols)*ch+inset;g.drawImage(img,sx,sy,cw-2*inset,ch-2*inset,x,y,w,h);return true}
+function caveBackdrop(r){
+ const grad=g.createLinearGradient(0,0,0,H);grad.addColorStop(0,'#080d15');grad.addColorStop(.6,r.theme);grad.addColorStop(1,'#080b12');g.fillStyle=grad;g.fillRect(0,0,W,H);
+ g.save();g.translate(-Math.floor(cam*.22),0);
+ for(let i=-2;i<Math.ceil(r.w/7);i++){let x=i*112,depth=24+(Math.sin(i*3.7)+1)*15;
+ g.fillStyle=i%2?'#151b24':'#111923';g.beginPath();g.moveTo(x,0);g.lineTo(x+28,depth);g.lineTo(x+51,10);g.lineTo(x+90,depth+35);g.lineTo(x+120,0);g.fill();
+ g.fillStyle='#111821';g.beginPath();g.moveTo(x,H);g.lineTo(x+38,H-58-(i%3)*16);g.lineTo(x+66,H-31);g.lineTo(x+110,H);g.fill();
+ }
+ g.restore();
+}
+function caveTerrain(r){
+ const ground=groundY(r);
+ // Large illustrated rock sections replace the old grey rectangle scenery.
+ const startX=Math.max(0,Math.floor(cam/64)*64-64),endX=Math.min(r.w*T,cam+W+96);
+ for(let x=startX;x<endX;x+=64){caveTile((Math.floor(x/64)%3),x,ground-8,66,82);caveTile(8+(Math.floor(x/64)%4),x,ground+49,66,70)}
+ for(const [tx,ty,tw] of r.platforms){const x=tx*T,y=ty*T,w=tw*T;for(let j=0;j<w;j+=48)caveTile(j===0?2:j+48>=w?4:3,x+j,y-15,Math.min(49,w-j),39)}
+ for(const [tx,ty,tw] of r.walls){const x=tx*T,y=ty*T,w=tw*T;for(let j=0;j<w;j+=48){caveTile(j===0?9:10,x+j,y-12,Math.min(49,w-j),ground-y+20)}}
+ // Foreground formations are visual decorations; collision geometry remains unchanged.
+ for(let i=Math.floor(startX/144);i<=Math.ceil(endX/144);i++){
+ const x=i*144+43,choice=Math.abs(i)%4;
+ if(choice===0)caveTile(16+(Math.abs(i)%3),x,0,38,58);
+ if(choice===1)caveTile(19+(Math.abs(i)%3),x,ground-41,38,48);
+ if(choice===2)caveTile(22,x,ground-64,42,72);
+ if(choice===3)caveTile(24+(Math.abs(i)%3),x,ground-24,35,30);
+ }
+}
+function drawHero(){if(!art.hero)return false;const img=art.hero,fw=img.width/3,fh=img.height,walking=Math.abs(p.vx)>.15&&p.grounded,idx=walking?Math.floor(frame/9)%3:0;g.save();if(p.facing<0){g.translate(p.x+p.w/2,0);g.scale(-1,1);g.translate(-(p.x+p.w/2),0)}const height=p.crouching?25:41,width=height*.93;g.drawImage(img,idx*fw,0,fw,fh,p.x+p.w/2-width/2,p.y+p.h-height,width,height);g.restore();return true}
 const W=480,H=270,T=16,rooms=[
 {name:'The Forgotten Settlement',w:100,h:18,ground:14,theme:'#252a32',exit:92,entry:5,platforms:[[13,11,7],[28,9,8],[45,11,9],[66,8,10],[82,11,8]],walls:[[22,12,3],[54,12,4]],water:[],items:[['balloon',7,12],['gas',10,10],['worm',14,10],['food',18,10],['gas',32,8],['gas',47,9],['lead',63,13],['dog',74,7],['worm',87,10]],child:null},
 {name:'The Rootworks',w:110,h:20,ground:16,theme:'#1b3030',exit:101,entry:7,platforms:[[12,13,10],[32,10,8],[50,13,10],[72,9,12],[91,12,10]],walls:[[25,14,4],[63,14,4]],water:[[38,16,17]],items:[['worm',15,12],['bat',36,9],['food',55,12],['gas',75,8],['lead',93,15]],child:84},
@@ -63,9 +88,10 @@ if(p.x>(r.exit*T-12)&&p.y>groundY(r)-85){advance()}
 if(frame%1100===0){p.canary=Math.max(0,p.canary-6);if(p.canary<30)say('The canary needs food. Press F to feed it.')}
 cam=Math.max(0,Math.min(r.w*T-W,p.x-W*.38));}
 function rect(x,y,w,h,col){g.fillStyle=col;g.fillRect(Math.round(x),Math.round(y),Math.ceil(w),Math.ceil(h))}
-function render(){const r=rooms[level];g.fillStyle=r.theme;g.fillRect(0,0,W,H);g.save();g.translate(-Math.floor(cam),0);
-for(let i=0;i<r.w;i+=3){let x=i*T,y=25+Math.sin(i*1.7)*19;rect(x,y,30,4,'#343e47');rect(x+8,y+5,7,12,'#29333c')}
-for(const b of solidRects(r)){rect(b[0],b[1],b[2],b[3],b[4]==='oneway'?'#8d6a43':'#41454a');rect(b[0],b[1],b[2],3,'#6e7168');for(let j=0;j<b[2];j+=32){const bw=Math.min(32,b[2]-j);caveTile(b[1]>=groundY(r)?0:(j===0?2:3),b[0]+j,b[1]-6,bw,Math.min(38,Math.max(16,b[3])))}for(let j=4;j<b[2];j+=17)rect(b[0]+j,b[1]+6,5,3,'#555a58')}
+function render(){const r=rooms[level];caveBackdrop(r);g.save();g.translate(-Math.floor(cam),0);
+if(art.cave){caveTerrain(r)}else{
+for(const b of solidRects(r)){rect(b[0],b[1],b[2],b[3],'#41454a');rect(b[0],b[1],b[2],3,'#6e7168')}
+}
 for(const [x,y,w] of r.water){rect(x*T,y*T-32,w*T,groundY(r)-(y*T-32),'#265675');for(let j=0;j<w*T;j+=15)rect(x*T+j,y*T-32+Math.sin(frame*.05+j)*2,8,2,'#5d9eaf')}
 for(const it of r.items){if(it[3])continue;const [type,x,y]=it;const colors={worm:'#d9f7a1',food:'#c28fc7',balloon:'#e25753',gas:'#65bce9',lead:'#9eabb0',dog:'#b99162',bat:'#8fa3cd'};rect(x*T-4,y*T-5,8,9,colors[type]);if(type==='balloon'){rect(x*T,y*T+4,1,13,'#d6c2a1')}if(type==='worm')rect(x*T-1,y*T-8,3,3,'#fff5c2')}
 if(r.child!==null&&!r.found){rect(r.child*T-4,groundY(r)-23,9,15,'#d1a975');rect(r.child*T-3,groundY(r)-27,7,7,'#e5c9a0')}

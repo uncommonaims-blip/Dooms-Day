@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"><title>Dooms Day · Cave 2 Layered Workshop</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#0b1019;color:#e7eef7;font:14px system-ui;overflow:hidden}header{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:8px;background:#1b293a}button,a{color:#fff;background:#293c53;border:1px solid #526a82;border-radius:7px;padding:8px;text-decoration:none}button{cursor:pointer}button[aria-pressed=true]{background:#52715e}#view{height:calc(100dvh - 122px);overflow:hidden;touch-action:none;position:relative;background:#070b11}canvas{width:100%;height:100%;display:block;touch-action:none}footer{padding:8px;background:#192536;display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:12px}#touch{position:fixed;bottom:60px;left:0;right:0;display:flex;justify-content:space-between;pointer-events:none;padding:10px}#touch>div{display:flex;gap:8px}#touch button{pointer-events:auto;min-width:58px;height:56px;font-size:22px;background:#26394acc;touch-action:none}#message{color:#f2d394}label{display:inline-flex;gap:5px;align-items:center}input{accent-color:#80d7b4}@media(max-width:700px){#view{height:calc(100dvh - 155px)}header{gap:5px;padding:5px}button,a{padding:6px}footer{gap:6px}}
+</style></head><body>
+<header><strong>Dooms Day · Cave 2</strong><a href="living-cavern.html">Original workshop</a><button id="fit">Fit scene</button><button id="zoomIn">＋</button><button id="zoomOut">－</button><button id="test" aria-pressed="false">▶ Test play</button><button id="reset">Reset hero</button></header>
+<header><label><input id="back" type="checkbox" checked>Background</label><label><input id="mid" type="checkbox" checked>Midground</label><label><input id="fore" type="checkbox" checked>Foreground</label><label><input id="mask" type="checkbox">Collision mask</label><label><input id="outline" type="checkbox" checked>JSON outlines</label></header>
+<div id="view"><canvas id="stage"></canvas></div>
+<div id="touch"><div><button data-key="left" aria-label="Move left">◀</button><button data-key="right" aria-label="Move right">▶</button></div><div><button data-key="jump" aria-label="Jump">⤒</button></div></div>
+<footer><span id="message">Loading cave assets…</span><span id="stats"></span><span>Drag to pan · pinch or ＋/－ to zoom · arrows/WASD and Space to move</span></footer>
+<script>
+'use strict';
+const W=4096,H=1365,paths={back:'assets/cave/cave2-back.png',mid:'assets/cave/cave2-midground-4k.png',fore:'assets/cave/cave2-fore.png',mask:'assets/cave/cave2-midground-collision-mask-4k.png',json:'assets/cave/cave2-collision-geometry.json'};
+const view=document.querySelector('#view'),canvas=document.querySelector('#stage'),ctx=canvas.getContext('2d'),msg=document.querySelector('#message'),stats=document.querySelector('#stats');
+const $=id=>document.getElementById(id),images={},keys={left:false,right:false,jump:false};let contours=[],scale=.25,panX=0,panY=0,playing=false,maskData=null,last=0,drag=null;const hero={x:180,y:460,vx:0,vy:0,w:28,h:62,grounded:false};
+function loadImage(url){return new Promise((resolve,reject)=>{const img=new Image();img.onload=()=>resolve(img);img.onerror=()=>reject(new Error('Could not load '+url));img.src=url})}
+function resize(){const r=view.getBoundingClientRect(),dpr=Math.min(2,devicePixelRatio||1);canvas.width=Math.round(r.width*dpr);canvas.height=Math.round(r.height*dpr);ctx.setTransform(dpr,0,0,dpr,0,0);draw()}
+function fit(){const r=view.getBoundingClientRect();scale=Math.min(r.width/W,r.height/H)*.96;panX=(r.width-W*scale)/2;panY=(r.height-H*scale)/2;draw()}
+function zoomAt(f,x=view.clientWidth/2,y=view.clientHeight/2){const nx=(x-panX)/scale,ny=(y-panY)/scale;scale=Math.max(.07,Math.min(2.5,scale*f));panX=x-nx*scale;panY=y-ny*scale;draw()}
+function drawLayer(name,depth){if(!images[name]||!$(name).checked)return;ctx.save();const parallax=(1-depth)*.065;const dx=(view.clientWidth/2-panX-W*scale/2)*parallax;ctx.globalAlpha=1;ctx.drawImage(images[name],panX+dx,panY, W*scale,H*scale);ctx.restore()}
+function draw(){if(!canvas.width)return;const dpr=Math.min(2,devicePixelRatio||1),w=canvas.width/dpr,h=canvas.height/dpr;ctx.clearRect(0,0,w,h);ctx.fillStyle='#080d16';ctx.fillRect(0,0,w,h);
+drawLayer('back',.5);drawLayer('mid',1);
+if($('mask').checked&&images.mask){ctx.save();ctx.globalAlpha=.38;ctx.drawImage(images.mask,panX,panY,W*scale,H*scale);ctx.restore()}
+if($('outline').checked&&contours.length){ctx.save();ctx.translate(panX,panY);ctx.scale(scale,scale);ctx.strokeStyle='#ffb64e';ctx.lineWidth=Math.max(2,2/scale);for(const c of contours){const p=c.points||[];if(p.length<2)continue;ctx.beginPath();ctx.moveTo(p[0][0],p[0][1]);for(let i=1;i<p.length;i++)ctx.lineTo(p[i][0],p[i][1]);ctx.closePath();ctx.stroke()}ctx.restore()}
+if(playing){ctx.save();ctx.fillStyle='#f4d7a4';ctx.strokeStyle='#293b48';ctx.lineWidth=2;ctx.fillRect(panX+(hero.x-hero.w/2)*scale,panY+(hero.y-hero.h)*scale,hero.w*scale,hero.h*scale);ctx.strokeRect(panX+(hero.x-hero.w/2)*scale,panY+(hero.y-hero.h)*scale,hero.w*scale,hero.h*scale);ctx.restore()}
+drawLayer('fore',.82);stats.textContent='4096 × 1365 · '+Math.round(scale*100)+'% · '+contours.length+' draft contours'}
+function isSolid(x,y){if(!maskData||x<0||y<0||x>=W||y>=H)return false;const i=(Math.floor(y)*W+Math.floor(x))*4;return maskData[i+3]>127&&(maskData[i]+maskData[i+1]+maskData[i+2])>90}
+function resetHero(){hero.x=200;hero.y=350;hero.vy=0;hero.grounded=false;draw()}
+function step(dt){hero.vx=(Number(keys.right)-Number(keys.left))*310;if(keys.jump&&hero.grounded){hero.vy=-610;hero.grounded=false}hero.vy=Math.min(1100,hero.vy+1350*dt);
+const prevY=hero.y,oldX=hero.x;hero.x=Math.max(hero.w/2,Math.min(W-hero.w/2,hero.x+hero.vx*dt));if(hero.vx&&isSolid(hero.x+Math.sign(hero.vx)*hero.w*.5,hero.y-hero.h*.5))hero.x=oldX;
+hero.y+=hero.vy*dt;hero.grounded=false;
+if(hero.vy>=0){const bottom=Math.min(H-1,Math.floor(hero.y)),start=Math.max(0,Math.floor(prevY));let found=-1;for(let y=start;y<=bottom;y+=2){if(isSolid(hero.x,y)||isSolid(hero.x-hero.w*.3,y)||isSolid(hero.x+hero.w*.3,y)){found=y;break}}if(found>=0){hero.y=found;hero.vy=0;hero.grounded=true}}
+else if(isSolid(hero.x,hero.y-hero.h)){hero.vy=0;hero.y+=8}
+if(hero.y>H+100)resetHero();
+const cx=view.clientWidth*.42,cy=view.clientHeight*.5;panX+=(cx-(panX+hero.x*scale))*.09;panY+=(cy-(panY+(hero.y-hero.h/2)*scale))*.09}
+function frame(t){const dt=Math.min(.035,(t-last)/1000||0);last=t;if(playing)step(dt);draw();requestAnimationFrame(frame)}
+$('fit').onclick=fit;$('zoomIn').onclick=()=>zoomAt(1.25);$('zoomOut').onclick=()=>zoomAt(.8);$('reset').onclick=resetHero;
+$('test').onclick=()=>{playing=!playing;$('test').setAttribute('aria-pressed',String(playing));$('test').textContent=playing?'■ Stop test':'▶ Test play';msg.textContent=playing?'Draft mask physics active. Waterfalls/crystals may be incorrectly solid.':'Inspecting layer alignment and collision geometry.'};
+for(const id of ['back','mid','fore','mask','outline'])$(id).onchange=draw;
+document.addEventListener('keydown',e=>{const k=e.key.toLowerCase();if(['arrowleft','a'].includes(k))keys.left=true;if(['arrowright','d'].includes(k))keys.right=true;if([' ','arrowup','w'].includes(k))keys.jump=true;if(['arrowleft','arrowright','arrowup',' '].includes(k))e.preventDefault()});
+document.addEventListener('keyup',e=>{const k=e.key.toLowerCase();if(['arrowleft','a'].includes(k))keys.left=false;if(['arrowright','d'].includes(k))keys.right=false;if([' ','arrowup','w'].includes(k))keys.jump=false});
+for(const b of document.querySelectorAll('[data-key]')){const k=b.dataset.key;b.addEventListener('pointerdown',e=>{e.preventDefault();b.setPointerCapture(e.pointerId);keys[k]=true});for(const ev of ['pointerup','pointercancel','lostpointercapture'])b.addEventListener(ev,()=>keys[k]=false)}
+const pointers=new Map();let pinch=null;view.addEventListener('pointerdown',e=>{view.setPointerCapture(e.pointerId);pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});if(pointers.size===2)pinch=null});
+view.addEventListener('pointermove',e=>{if(!pointers.has(e.pointerId)||playing)return;const old=pointers.get(e.pointerId);pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});const pts=[...pointers.values()];if(pts.length===1){panX+=e.clientX-old.x;panY+=e.clientY-old.y}else if(pts.length===2){const d=Math.hypot(pts[0].x-pts[1].x,pts[0].y-pts[1].y);if(pinch)zoomAt(d/pinch,(pts[0].x+pts[1].x)/2-view.getBoundingClientRect().left,(pts[0].y+pts[1].y)/2-view.getBoundingClientRect().top);pinch=d}draw()});
+for(const ev of ['pointerup','pointercancel','lostpointercapture'])view.addEventListener(ev,e=>{pointers.delete(e.pointerId);pinch=null});
+view.addEventListener('wheel',e=>{e.preventDefault();zoomAt(e.deltaY<0?1.12:.89,e.offsetX,e.offsetY)},{passive:false});
+window.addEventListener('resize',resize);
+(async()=>{const errors=[];await Promise.all(['back','mid','fore','mask'].map(async k=>{try{images[k]=await loadImage(paths[k])}catch(e){errors.push(e.message)}}));
+try{const res=await fetch(paths.json);if(!res.ok)throw Error('HTTP '+res.status);const data=await res.json();if(data.width!==W||data.height!==H)throw Error('Geometry dimensions differ from 4K artwork');contours=data.contours||[]}catch(e){errors.push('Collision JSON: '+e.message)}
+if(images.mask){try{const off=document.createElement('canvas');off.width=W;off.height=H;const c=off.getContext('2d',{willReadFrequently:true});c.drawImage(images.mask,0,0,W,H);maskData=c.getImageData(0,0,W,H).data}catch(e){errors.push('Mask sampling: '+e.message)}}
+resize();fit();msg.textContent=errors.length?'Asset warnings: '+errors.join(' | '):'All five assets loaded. Inspect alignment, then press Test play.';requestAnimationFrame(frame)})();
+</script></body></html>

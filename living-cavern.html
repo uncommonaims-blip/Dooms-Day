@@ -12,7 +12,7 @@
 #nodeHalo #haloDone{left:105px;top:0;font-size:23px}
 #nodeHalo #haloStep:active,#nodeHalo #haloDone:active{background:#d6e0e9a8!important;color:#344352}
  #versionBadge{position:fixed;right:7px;top:5px;z-index:65;background:#111d2be8;border:1px solid #92a7b8;border-radius:6px;padding:4px 7px;font-size:11px;font-weight:700;pointer-events:auto;cursor:pointer;touch-action:manipulation}header{padding-right:55px!important}body.immersive header{right:47px}#pullRefresh{position:fixed;top:-65px;left:50%;transform:translateX(-50%);z-index:80;background:#273c51;color:#fff;border:1px solid #93acc4;border-radius:0 0 14px 14px;padding:10px 18px;box-shadow:0 4px 14px #0008;transition:top .18s;pointer-events:none;white-space:nowrap}#pullRefresh.visible{top:0} </style></head><body>
-<button id="versionBadge" type="button" title="Save and reload Workshop" aria-label="Save edits and reload Workshop">v19 ↻</button><div id="pullRefresh" aria-live="polite">↓ Pull down to reload</div><header><strong>DOOMS DAY · Living Cavern</strong><button id="fullscreen">⛶ Full screen</button><span id="editControls"><select id="kind"><option value="floor">Floor / ledge</option><option value="platform">One-way platform</option><option value="wall">Solid wall</option><option value="ceiling">Ceiling</option><option value="hazard">Lava / hazard</option></select><button id="add">+ Draw boundary</button><button id="finish">Finish</button><button id="del">Delete</button><button id="undo">Undo point</button></span><button id="mode">▶ Test play</button><label id="debugLabel"><input id="guides" type="checkbox" checked>Show collisions</label><label><input id="animated" type="checkbox">Animated</label><button id="minus">−</button><span id="zoomLabel">100%</span><button id="plus">+</button><button id="fit">Fit</button><span id="status">Loading cave artwork…</span></header>
+<button id="versionBadge" type="button" title="Save and reload Workshop" aria-label="Save edits and reload Workshop">v20 ↻</button><div id="pullRefresh" aria-live="polite">↓ Pull down to reload</div><header><strong>DOOMS DAY · Living Cavern</strong><button id="fullscreen">⛶ Full screen</button><span id="editControls"><select id="kind"><option value="floor">Floor / ledge</option><option value="platform">One-way platform</option><option value="wall">Solid wall</option><option value="ceiling">Ceiling</option><option value="hazard">Lava / hazard</option></select><button id="add">+ Draw boundary</button><button id="finish">Finish</button><button id="del">Delete</button><button id="undo">Undo point</button></span><button id="mode">▶ Test play</button><label id="debugLabel"><input id="guides" type="checkbox" checked>Show collisions</label><label><input id="animated" type="checkbox">Animated</label><button id="minus">−</button><span id="zoomLabel">100%</span><button id="plus">+</button><button id="fit">Fit</button><span id="status">Loading cave artwork…</span></header>
 <div id="viewport"><div id="scene"><img id="still" src="assets/cave/cave-1-still.jpg" alt="Cavern level background"><video id="v1" src="assets/cave/cave-1-mini.mp4" muted playsinline preload="auto"></video><video id="v2" src="assets/cave/cave-1-mini.mp4" muted playsinline preload="auto"></video><canvas id="overlay" width="1536" height="512"></canvas></div></div>
 <div id="help">Two fingers: drag to move the cavern, pinch to zoom. One finger: edit points. EDIT: choose boundary type, tap “Draw boundary,” then tap points on the image. Tap Finish to save. Drag existing points to reshape. Tap a line to select it. TEST: arrow keys or touch controls, Space to jump. The video and collision coordinates share the same image dimensions.</div>
 <div id="footer"><button id="save">Save locally</button><button id="load">Load</button><button id="resetMap">Restore starter map</button><button id="export">Export collision JSON</button><button id="import">Import JSON</button><input type="file" id="file" accept=".json,application/json" hidden><span id="hud"></span></div>
@@ -56,15 +56,33 @@ document.addEventListener('touchmove',e=>{
 document.addEventListener('touchend',()=>{
  if(!refreshStart)return;
  const reload=refreshReady;refreshStart=null;refreshReady=false;
- if(reload){refreshTip.textContent='↻ Reloading…';location.reload()}else refreshTip.classList.remove('visible');
+ if(reload){refreshTip.textContent='↻ Reloading…';saveView();location.reload()}else refreshTip.classList.remove('visible');
 },{passive:true});
 document.addEventListener('touchcancel',()=>{refreshStart=null;refreshReady=false;refreshTip.classList.remove('visible')},{passive:true});
-resizeScene();fit();status('Image loaded: '+W+' × '+H)};
+resizeScene();restoreView();status('Image loaded: '+W+' × '+H)};
 still.onerror=()=>status('Still image missing. Check assets/cave/cave-1-still.jpg');
-function applyView(){positionHalo();scene.style.transform='translate('+offsetX+'px,'+offsetY+'px) scale('+zoom+')';$('#zoomLabel').textContent=Math.round(zoom*100)+'%';refreshCanvasResolution();render();positionHalo()}
+function applyView(){scheduleViewSave();positionHalo();scene.style.transform='translate('+offsetX+'px,'+offsetY+'px) scale('+zoom+')';$('#zoomLabel').textContent=Math.round(zoom*100)+'%';refreshCanvasResolution();render();positionHalo()}
 function setZoom(z,cx=$('#viewport').clientWidth/2,cy=$('#viewport').clientHeight/2){
  const next=Math.max(.15,Math.min(5,z)),worldX=(cx-offsetX)/zoom,worldY=(cy-offsetY)/zoom;
  offsetX=cx-worldX*next;offsetY=cy-worldY*next;zoom=next;applyView();
+}
+// Save the viewport independently from collision geometry, using the image-space center.
+// This survives window resizing, full-screen transitions, reloads, and workshop upgrades.
+const viewKey='dooms-living-cavern-view-v1';
+let viewSaveEnabled=false,viewSaveTimer=null;
+function saveView(){
+ if(!viewSaveEnabled||!Number.isFinite(zoom)||zoom<=0)return;
+ const v=$('#viewport');if(!v.clientWidth||!v.clientHeight)return;
+ try{localStorage.setItem(viewKey,JSON.stringify({zoom,centerX:(v.clientWidth/2-offsetX)/zoom,centerY:(v.clientHeight/2-offsetY)/zoom}))}catch(e){status('View position could not be saved')}
+}
+function scheduleViewSave(){if(!viewSaveEnabled)return;clearTimeout(viewSaveTimer);viewSaveTimer=setTimeout(saveView,450)}
+function restoreView(){
+ let saved=null;try{saved=JSON.parse(localStorage.getItem(viewKey)||'null')}catch(e){}
+ const v=$('#viewport');
+ if(saved&&[saved.zoom,saved.centerX,saved.centerY].every(Number.isFinite)&&saved.zoom>=.15&&saved.zoom<=5){
+  zoom=saved.zoom;offsetX=v.clientWidth/2-saved.centerX*zoom;offsetY=v.clientHeight/2-saved.centerY*zoom;applyView();
+ }else fit();
+ viewSaveEnabled=true;
 }
 function fit(){
  const v=$('#viewport'),w=v.clientWidth,h=v.clientHeight;
@@ -198,9 +216,9 @@ function scheduleAutosave(){
  if(!autosaveEnabled)return;
  clearTimeout(autosaveTimer);autosaveTimer=setTimeout(persistMap,450);
 }
-$('#versionBadge').onclick=()=>{clearTimeout(autosaveTimer);persistMap();location.reload()};
-window.addEventListener('pagehide',()=>{clearTimeout(autosaveTimer);persistMap()});
-document.addEventListener('visibilitychange',()=>{if(document.hidden){clearTimeout(autosaveTimer);persistMap()}});
+$('#versionBadge').onclick=()=>{clearTimeout(autosaveTimer);clearTimeout(viewSaveTimer);persistMap();saveView();location.reload()};
+window.addEventListener('pagehide',()=>{clearTimeout(autosaveTimer);clearTimeout(viewSaveTimer);persistMap();saveView()});
+document.addEventListener('visibilitychange',()=>{if(document.hidden){clearTimeout(autosaveTimer);clearTimeout(viewSaveTimer);persistMap();saveView()}});
 
 const starterMap=[{"type":"floor","points":[{"x":0,"y":378},{"x":72,"y":377},{"x":126,"y":384},{"x":181,"y":398},{"x":225,"y":407}]},{"type":"floor","points":[{"x":231,"y":411},{"x":274,"y":425},{"x":313,"y":445},{"x":351,"y":450}]},{"type":"floor","points":[{"x":379,"y":437},{"x":417,"y":410},{"x":451,"y":401},{"x":484,"y":414}]},{"type":"platform","points":[{"x":168,"y":313},{"x":213,"y":309},{"x":258,"y":316}]},{"type":"platform","points":[{"x":321,"y":338},{"x":375,"y":332},{"x":417,"y":339}]},{"type":"platform","points":[{"x":502,"y":310},{"x":565,"y":305},{"x":622,"y":314}]},{"type":"floor","points":[{"x":570,"y":452},{"x":628,"y":446},{"x":682,"y":454},{"x":733,"y":466}]},{"type":"platform","points":[{"x":732,"y":357},{"x":793,"y":354},{"x":849,"y":359}]},{"type":"platform","points":[{"x":876,"y":293},{"x":925,"y":286},{"x":976,"y":290}]},{"type":"floor","points":[{"x":1021,"y":454},{"x":1077,"y":449},{"x":1136,"y":453},{"x":1194,"y":440}]},{"type":"platform","points":[{"x":1111,"y":342},{"x":1168,"y":333},{"x":1221,"y":341}]},{"type":"floor","points":[{"x":1250,"y":410},{"x":1311,"y":399},{"x":1368,"y":402},{"x":1426,"y":385},{"x":1536,"y":382}]},{"type":"ceiling","points":[{"x":0,"y":88},{"x":75,"y":94},{"x":135,"y":105},{"x":183,"y":89},{"x":235,"y":96}]},{"type":"ceiling","points":[{"x":251,"y":91},{"x":314,"y":116},{"x":375,"y":97},{"x":431,"y":111},{"x":495,"y":91}]},{"type":"ceiling","points":[{"x":515,"y":77},{"x":574,"y":96},{"x":642,"y":111},{"x":710,"y":91},{"x":778,"y":103}]},{"type":"ceiling","points":[{"x":801,"y":93},{"x":869,"y":107},{"x":926,"y":92},{"x":1005,"y":109}]},{"type":"ceiling","points":[{"x":1031,"y":99},{"x":1113,"y":111},{"x":1178,"y":93},{"x":1260,"y":102},{"x":1333,"y":90},{"x":1430,"y":101},{"x":1536,"y":90}]},{"type":"hazard","points":[{"x":361,"y":492},{"x":418,"y":487},{"x":470,"y":492},{"x":532,"y":488},{"x":573,"y":498}]},{"type":"hazard","points":[{"x":741,"y":494},{"x":814,"y":487},{"x":881,"y":492},{"x":948,"y":490},{"x":1005,"y":496}]}];
 $('#resetMap').onclick=()=>{if(polys.length&&!confirm('Replace current boundaries with the starter map? Save or export your edits first.'))return;polys=JSON.parse(JSON.stringify(starterMap));selected=-1;render();status('Starter map restored. Adjust points to fit the artwork.')};
@@ -255,5 +273,5 @@ setInterval(crossfade,25);
 try{const saved=localStorage.getItem(key);polys=saved?validate(JSON.parse(saved)):JSON.parse(JSON.stringify(starterMap));lastSavedSnapshot=saved?JSON.stringify({width:W,height:H,boundaries:polys}):null}
 catch(e){polys=JSON.parse(JSON.stringify(starterMap));status('Saved map could not be loaded: '+e.message)}
 autosaveEnabled=true;
-resizeScene();fit();
+resizeScene();restoreView();
 </script></body></html>

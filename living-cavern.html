@@ -24,6 +24,7 @@ html,body,button,#playControls,#playControls *,#testJoystickZone,#testJoystick,#
 <button class="radial" data-nudge="-1,0" title="Move left" style="--angle:180deg">◀</button>
 <button class="radial" data-nudge="1,0" title="Move right" style="--angle:0deg;--radius:55px">▶</button>
 <button class="radial" id="haloDelete" title="Delete node" style="--angle:145deg">✕</button>
+<button class="radial" id="haloSplit" title="Split boundary at this node into two independent segments" style="--angle:125deg;--radius:90px">✂</button>
 <button class="radial" data-nudge="0,1" title="Move down" style="--angle:90deg">▼</button>
 <button class="radial" id="haloTypeButton" title="Change collision type" style="--angle:40deg">●</button>
 <button id="haloStep" title="Change nudge distance">4</button>
@@ -279,6 +280,19 @@ $('#haloBefore').onclick=()=>addAdjacent(false);$('#haloAfter').onclick=()=>addA
 $('#haloTypeButton').onclick=()=>{$('#typeRing').hidden=!$('#typeRing').hidden};
 document.querySelectorAll('#typeRing [data-type]').forEach(b=>b.onclick=()=>{$('#haloType').value=b.dataset.type;$('#haloType').onchange({target:$('#haloType')});$('#typeRing').hidden=true});
 $('#haloType').onchange=e=>{if(selected<0)return;polys[selected].type=e.target.value;$('#kind').value=e.target.value;render();positionHalo()};
+$('#haloSplit').onclick=()=>{
+ if(playing||selected<0||nodeIndex<=0)return;
+ const original=polys[selected],pts=original.points;
+ if(!original||original.type==='shroud'){status('Split supports open floor, wall, ceiling, hazard and platform lines.');return}
+ if(nodeIndex>=pts.length-1){status('Select an interior node to split this boundary.');return}
+ const before=historySnapshot(),cut=nodeIndex;
+ const left={...original,points:pts.slice(0,cut+1).map(p=>({...p}))};
+ const right={...original,points:pts.slice(cut).map(p=>({...p}))};
+ polys.splice(selected,1,left,right);
+ selected=selected+1;nodeIndex=0;groupSelected=false;
+ pushHistory(before);persistMap();render();positionHalo();
+ status('Boundary split into two independent segments at the selected node. Undo available.');
+};
 $('#haloDelete').onclick=()=>{if(selected<0||nodeIndex<0)return;const pts=polys[selected].points;pts.splice(nodeIndex,1);if(pts.length<2){polys.splice(selected,1);selected=-1;hideHalo()}else{nodeIndex=Math.min(nodeIndex,pts.length-1);positionHalo()}render()};
 $('#haloClose').onclick=hideHalo;$('#haloDone').onclick=hideHalo;
 $('#add').onclick=()=>{if(playing)return;drawing={type:$('#kind').value,points:[]};selected=-1;hideHalo();status('Tap to add boundary points, then Finish');render()};

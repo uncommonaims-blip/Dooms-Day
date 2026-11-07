@@ -447,19 +447,15 @@ async function selectCaveLevel(level){
  selected=-1;drawing=null;nodeIndex=-1;undoStack.length=0;redoStack.length=0;
  updateHistoryButtons();lastSavedSnapshot=null;
  if(level===2){
+  // Start Cave 2 with an empty, editable collision map. Use a new storage
+  // namespace so previously imported draft contours do not reappear.
+  key='dooms-living-cavern-collisions-cave2-blank-v1';
   try{
-   if(!cave2Starter.length){
-    const res=await fetch(cave2Assets.geometry);
-    if(!res.ok)throw Error('Collision JSON HTTP '+res.status);
-    const data=await res.json();
-    if(data.width!==4096||data.height!==1365)throw Error('Collision geometry size mismatch');
-    cave2Starter=draftBoundariesFromContours(data);
-   }
    const saved=localStorage.getItem(key);
-   polys=saved?validate(JSON.parse(saved)):JSON.parse(JSON.stringify(cave2Starter));
-   W=4096;H=1365;still.src=cave2Assets.mid;
-   status('Cave 2 loaded: '+polys.length+' editable silhouette guides and temporary floor. Draw floor/platform lines for accurate collision.');
-  }catch(e){polys=[];W=4096;H=1365;still.src=cave2Assets.mid;status('Cave 2 geometry could not load: '+e.message)}
+   polys=saved?validate(JSON.parse(saved)):[];
+  }catch(e){polys=[];status('Cave 2 saved map invalid; starting empty')}
+  W=4096;H=1365;still.src=cave2Assets.mid;
+  status('Cave 2: blank collision map. Use Draw boundary to trace the level.');
  }else{
   const saved=localStorage.getItem(key);
   try{polys=saved?validate(JSON.parse(saved)):JSON.parse(JSON.stringify(starterMap))}

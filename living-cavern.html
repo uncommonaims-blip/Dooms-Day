@@ -427,6 +427,8 @@ function draftBoundariesFromContours(data){
   const pts=c.points.filter((p,i)=>i%stride===0).map(p=>({x:p[0],y:p[1]}));
   if(pts.length>=3)result.push({type:'shroud',points:pts,occlude:false,trigger:false});
  }
+ // Temporary editable safety floor so test-play does not immediately fall through.
+ result.push({type:'floor',points:[{x:0,y:1290},{x:4096,y:1290}]});
  return result;
 }
 async function selectCaveLevel(level){
@@ -456,7 +458,7 @@ async function selectCaveLevel(level){
    const saved=localStorage.getItem(key);
    polys=saved?validate(JSON.parse(saved)):JSON.parse(JSON.stringify(cave2Starter));
    W=4096;H=1365;still.src=cave2Assets.mid;
-   status('Cave 2 loaded: '+polys.length+' editable draft silhouette guides. Draw floor/platform lines for playable collision.');
+   status('Cave 2 loaded: '+polys.length+' editable silhouette guides and temporary floor. Draw floor/platform lines for accurate collision.');
   }catch(e){polys=[];W=4096;H=1365;still.src=cave2Assets.mid;status('Cave 2 geometry could not load: '+e.message)}
  }else{
   const saved=localStorage.getItem(key);

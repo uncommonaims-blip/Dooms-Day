@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><title>Dooms Day</title><style>
+*{box-sizing:border-box}html,body,#game,#controls,#controls *{user-select:none!important;-webkit-user-select:none!important;-webkit-touch-callout:none!important;-webkit-tap-highlight-color:transparent!important}html,body{overscroll-behavior:none}#game,#controls,#controls *{touch-action:none}body{margin:0;background:#090e15;color:#e8dcc0;font:14px Georgia,serif;overflow:hidden}canvas{display:block;position:fixed;inset:0;width:100vw;height:100dvh;image-rendering:pixelated;background:#090e15}#hud{position:fixed;top:12px;left:12px;pointer-events:none;text-shadow:1px 2px #000;line-height:1.6}#help{position:fixed;top:12px;right:12px;max-width:45%;text-align:right;color:#c7b99a;text-shadow:1px 2px #000}#controls{position:fixed;bottom:16px;left:12px;right:12px;display:flex;justify-content:flex-end;gap:8px;pointer-events:none}.cluster{display:flex;gap:9px;align-items:end}#joystickZone{position:fixed;inset:0 35% 0 0;touch-action:none;pointer-events:auto}#joystick{position:fixed;left:0;top:0;width:116px;height:116px;border:2px solid #d4c69a99;border-radius:50%;background:#24334577;box-shadow:0 0 24px #0009,inset 0 0 22px #070e18aa;pointer-events:none;display:none;transform:translate(-50%,-50%);z-index:4}#joystick.active{display:block}#stick{position:absolute;left:50%;top:50%;width:44px;height:44px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#d6c69c,#857d6b);border:2px solid #f2e3bc;transform:translate(-50%,-50%);box-shadow:0 2px 9px #0009}#controls{z-index:5} button{pointer-events:auto;display:grid;place-items:center;background:linear-gradient(145deg,#364657dd,#1b2635ee);border:2px solid #a5a48b;color:#f4e4bc;border-radius:16px;width:60px;height:60px;padding:12px;box-shadow:inset 0 1px #ffffff25,0 4px 0 #0a101a;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent}button svg{display:block;width:100%;height:100%;fill:none;stroke:currentColor;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}button:active,button.pressed{background:#806e48;transform:translateY(3px);box-shadow:inset 0 2px 5px #0008}button[data-key="jump"]{border-color:#e0b976}button[data-key="pulse"]{border-color:#88b6c7}@media(max-width:420px){button{width:52px;height:52px;padding:10px}.cluster{gap:6px}}#message{position:fixed;left:15%;right:15%;top:22%;text-align:center;font-size:18px;color:#f4e6bb;text-shadow:0 2px 4px #000;pointer-events:none}#title{font-weight:bold;letter-spacing:3px;color:#edca85}</style></head><body><canvas id="game" width="480" height="270"></canvas><div id="hud"></div><div id="help">Touch and drag on the left to move / crouch<br>Up + Jump: high · Down + sideways + Jump: low</div><div id="message"></div><div id="joystickZone" aria-label="Touch and drag for movement"></div><div id="joystick" aria-hidden="true"><div id="stick"></div></div><div id="controls"><div class="cluster"><button type="button" data-key="jump" aria-label="Jump" title="Jump"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 15 6-6 6 6"/><path d="M12 9v11"/></svg></button><button type="button" data-key="pulse" aria-label="Bat echolocation" title="Bat echolocation"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="2"/><path d="M7.5 7.5a6.4 6.4 0 0 0 0 9m9-9a6.4 6.4 0 0 1 0 9M4.5 4.5a10.6 10.6 0 0 0 0 15m15-15a10.6 10.6 0 0 1 0 15"/></svg></button><button type="button" id="lanternMode" aria-label="Hold lantern to aim" title="Hold lantern, then drag anywhere on the left to aim">🏮</button></div></div><script>
+const c=document.getElementById('game'),g=c.getContext('2d');g.imageSmoothingEnabled=false;
+// Asset-backed renderer. Images are optional so the prototype remains playable if a file fails.
+const art={cave:null,hero:null},assetStatus={cave:'loading',hero:'loading'};
+function removeAtlasBackdrop(img){
+ const cols=8,rows=6,cw=Math.floor(img.width/cols),ch=Math.floor(img.height/rows);
+ const cv=document.createElement('canvas');cv.width=img.width;cv.height=img.height;
+ const ctx=cv.getContext('2d',{willReadFrequently:true});ctx.drawImage(img,0,0);
+ const image=ctx.getImageData(0,0,cv.width,cv.height),d=image.data;
+ // Only clear near-neutral, edge-connected background pixels within each atlas cell.
+ // Interior gray rocks are protected by the flood-fill boundary.
+ for(let row=0;row<rows;row++)for(let col=0;col<cols;col++){
+  const x0=col*cw,y0=row*ch,w=Math.min(cw,cv.width-x0),h=Math.min(ch,cv.height-y0);
+  const corners=[[1,1],[w-2,1],[1,h-2],[w-2,h-2]].map(([x,y])=>{const k=((y0+y)*cv.width+x0+x)*4;return [d[k],d[k+1],d[k+2]]});
+  const neutral=corners.filter(c=>Math.max(...c)-Math.min(...c)<35);
+  if(!neutral.length)continue;
+  const base=[0,1,2].map(k=>neutral.reduce((a,c)=>a+c[k],0)/neutral.length);
+  const match=(x,y)=>{const k=((y0+y)*cv.width+x0+x)*4;const delta=Math.max(Math.abs(d[k]-base[0]),Math.abs(d[k+1]-base[1]),Math.abs(d[k+2]-base[2]));return d[k+3]>0&&delta<43&&Math.max(d[k],d[k+1],d[k+2])-Math.min(d[k],d[k+1],d[k+2])<48};
+  const seen=new Uint8Array(w*h),queue=[];
+  const push=(x,y)=>{const n=y*w+x;if(seen[n])return;seen[n]=1;if(match(x,y))queue.push(n)};
+  for(let x=0;x<w;x++){push(x,0);push(x,h-1)}
+  for(let y=1;y<h-1;y++){push(0,y);push(w-1,y)}
+  for(let head=0;head<queue.length;head++){const n=queue[head],x=n%w,y=(n/w)|0,k=((y0+y)*cv.width+x0+x)*4;d[k+3]=0;if(x>0)push(x-1,y);if(x+1<w)push(x+1,y);if(y>0)push(x,y-1);if(y+1<h)push(x,y+1)}
+ }
+ ctx.putImageData(image,0,0);return cv;
+}
+function loadArt(key,url){const img=new Image();img.onload=()=>{try{art[key]=key==='cave'?removeAtlasBackdrop(img):img;if(key==='hero')prepareHeroBounds(img);assetStatus[key]='ready'}catch(e){console.warn('Atlas cleanup fallback',e);art[key]=img;assetStatus[key]='ready'}};img.onerror=()=>{assetStatus[key]='missing'};img.src=url}
+loadArt('cave','assets/cave/cave-atlas.png');
+loadArt('hero','assets/characters/hero-walk.png');
+const soundtrack=new Audio();soundtrack.loop=true;soundtrack.volume=.35;
+const soundCandidates=['assets/sounds/Doom-track1.mp3'];
+let soundCandidate=0,soundReady=false;
+function trySound(){if(soundCandidate>=soundCandidates.length)return;soundtrack.src=soundCandidates[soundCandidate++];soundtrack.load()}
+soundtrack.addEventListener('canplay',()=>{soundReady=true},{once:true});
+soundtrack.addEventListener('error',()=>{if(!soundReady)trySound()});
+trySound();
+const musicButton=document.createElement('button');musicButton.type='button';musicButton.title='Toggle soundtrack';musicButton.setAttribute('aria-label','Toggle soundtrack');musicButton.textContent='♫';musicButton.style.cssText='position:fixed;top:86px;right:12px;z-index:7;width:44px;height:44px;padding:0;font-size:24px';
+document.body.appendChild(musicButton);
+musicButton.addEventListener('click',()=>{if(soundtrack.paused){soundtrack.play().then(()=>musicButton.style.opacity='1').catch(()=>say('Soundtrack not found. Check MP3 filename in assets/sounds.'))}else{soundtrack.pause();musicButton.style.opacity='.55'}});
+function caveTile(index,x,y,w,h){if(!art.cave)return false;const img=art.cave,cols=8,rows=6,cw=img.width/cols,ch=img.height/rows,inset=9;const sx=(index%cols)*cw+inset,sy=Math.floor(index/cols)*ch+inset;g.drawImage(img,sx,sy,cw-2*inset,ch-2*inset,x,y,w,h);return true}
+function caveBackdrop(r){
+ const grad=g.createLinearGradient(0,0,0,H);grad.addColorStop(0,'#080d15');grad.addColorStop(.6,r.theme);grad.addColorStop(1,'#080b12');g.fillStyle=grad;g.fillRect(0,0,W,H);
+ g.save();g.translate(-Math.floor(cam*.22),0);
+ for(let i=-2;i<Math.ceil(r.w/7);i++){let x=i*112,depth=24+(Math.sin(i*3.7)+1)*15;
+ g.fillStyle=i%2?'#151b24':'#111923';g.beginPath();g.moveTo(x,0);g.lineTo(x+28,depth);g.lineTo(x+51,10);g.lineTo(x+90,depth+35);g.lineTo(x+120,0);g.fill();
+ g.fillStyle='#111821';g.beginPath();g.moveTo(x,H);g.lineTo(x+38,H-58-(i%3)*16);g.lineTo(x+66,H-31);g.lineTo(x+110,H);g.fill();
+ }
+ g.restore();
+}
+function drawStalactite(x,y,w,h){g.fillStyle='#35383b';g.beginPath();g.moveTo(x,y);g.lineTo(x+w,y);g.lineTo(x+w*.56,y+h);g.lineTo(x+w*.33,y+h*.57);g.closePath();g.fill();g.strokeStyle='#64605b';g.lineWidth=1.5;g.beginPath();g.moveTo(x+3,y+2);g.lineTo(x+w*.48,y+h*.73);g.stroke()}
+function drawStalagmite(x,base,w,h){g.fillStyle='#414344';g.beginPath();g.moveTo(x,base);g.lineTo(x+w*.43,base-h);g.lineTo(x+w,base);g.closePath();g.fill();g.strokeStyle='#797066';g.lineWidth=2;g.beginPath();g.moveTo(x+4,base-2);g.lineTo(x+w*.43,base-h+8);g.stroke()}
+function drawBalloon(x,y,scale=1){g.save();g.translate(x,y);g.scale(scale,scale);g.fillStyle='#9d2535';g.beginPath();g.ellipse(0,0,10,14,0,0,Math.PI*2);g.fill();g.fillStyle='#e44c53';g.beginPath();g.ellipse(-2,-2,7,11,-.12,0,Math.PI*2);g.fill();g.fillStyle='#ffc5b0';g.beginPath();g.ellipse(-4,-6,2,5,-.3,0,Math.PI*2);g.fill();g.fillStyle='#a32c3a';g.beginPath();g.moveTo(-3,12);g.lineTo(3,12);g.lineTo(0,18);g.fill();g.restore()}
+function drawBat(x,y){const flap=Math.sin(frame*.32)*5;g.save();g.translate(x,y);g.fillStyle='#71819b';g.beginPath();g.moveTo(0,0);g.quadraticCurveTo(-9,-9-flap,-17,-4-flap);g.lineTo(-13,5);g.lineTo(-8,2);g.lineTo(-4,6);g.lineTo(0,2);g.quadraticCurveTo(9,-9-flap,17,-4-flap);g.lineTo(13,5);g.lineTo(8,2);g.lineTo(4,6);g.closePath();g.fill();g.fillStyle='#a4b5c8';g.beginPath();g.ellipse(0,0,4,6,0,0,Math.PI*2);g.fill();g.fillStyle='#d5dfe5';g.fillRect(-3,-2,2,2);g.fillRect(2,-2,2,2);g.restore()}
+function caveTerrain(r){
+ const ground=groundY(r);
+ const startX=Math.max(0,Math.floor(cam/64)*64-96),endX=Math.min(r.w*T,cam+W/WORLD_ZOOM+144);
+ // Continuous collision-aligned stone underlay: no open seams between decorative atlas sprites.
+ g.fillStyle='#24262b';g.fillRect(startX,ground,endX-startX,Math.max(H-ground,120));
+ g.fillStyle='#42403b';g.fillRect(startX,ground-5,endX-startX,9);
+ g.fillStyle='#62574a';g.fillRect(startX,ground-6,endX-startX,2);
+ // Art tiles overlap deliberately so transparent padding cannot expose a slit.
+ const step=56,overlap=12;
+ for(let x=Math.floor(startX/step)*step;x<endX;x+=step){
+  const n=Math.floor(x/step);
+  caveTile(((n%3)+3)%3,x-3,ground-16,step+overlap,83);
+  caveTile(8+((n%4)+4)%4,x-3,ground+48,step+overlap,72);
+ }
+ // Ceiling ridge and hanging formations remain transparent, never gray atlas rectangles.
+ g.fillStyle='#282a2e';g.fillRect(startX,-30,endX-startX,32);
+ for(let x=Math.floor(startX/62)*62;x<endX;x+=62)drawStalactite(x+8,0,29,27+Math.abs(Math.floor(x/62)%4)*10);
+ // Platforms use one continuous top and core, with illustrations layered over them.
+ for(const [tx,ty,tw] of r.platforms){
+  const x=tx*T,y=ty*T,w=tw*T;
+  g.fillStyle='#373630';g.fillRect(x,y,w,19);
+  g.fillStyle='#75634b';g.fillRect(x,y-3,w,5);
+  for(let j=0;j<w;j+=42)caveTile(j===0?2:j+42>=w?4:3,x+j-6,y-19,Math.min(58,w-j+10),45);
+  for(let j=22;j<w-12;j+=57)drawStalactite(x+j,y+17,18,24+(j%3)*8);
+ }
+ for(const [tx,ty,tw] of r.walls){
+  const x=tx*T,y=ty*T,w=tw*T;
+  g.fillStyle='#34343a';g.fillRect(x,y,w,Math.max(0,ground-y));
+  g.fillStyle='#75634b';g.fillRect(x,y-3,w,5);
+  for(let j=0;j<w;j+=42)caveTile(j===0?9:10,x+j-6,y-12,Math.min(58,w-j+10),ground-y+20);
+ }
+ for(let i=Math.floor(startX/144);i<=Math.ceil(endX/144);i++){
+  const x=i*144+43,choice=Math.abs(i)%4;
+  if(choice===0)drawStalactite(x,0,36,48+Math.abs(i%3)*10);
+  if(choice===1)drawStalagmite(x,ground,35,45);
+  if(choice===2)drawStalagmite(x,ground,42,70);
+  if(choice===3)caveTile(24+(Math.abs(i)%3),x,ground-29,35,30);if(i%3===0)caveTile(30+(Math.abs(i)%4),x+66,ground-37,26,38);
+ }
+}
+const heroFrameBounds=[];
+function prepareHeroBounds(img){heroFrameBounds.length=0;const cw=img.width/8,cv=document.createElement('canvas');cv.width=img.width;cv.height=img.height;const cx=cv.getContext('2d',{willReadFrequently:true});cx.drawImage(img,0,0);const data=cx.getImageData(0,0,cv.width,cv.height).data;for(let f=0;f<8;f++){let left=Math.floor(f*cw),right=Math.floor((f+1)*cw),top=img.height,bottom=0,minX=right,maxX=left;for(let y=0;y<img.height;y+=2)for(let x=left;x<right;x+=2){let k=(y*img.width+x)*4;if(data[k+3]>90){minX=Math.min(minX,x);maxX=Math.max(maxX,x);top=Math.min(top,y);bottom=Math.max(bottom,y)}}heroFrameBounds.push(bottom>top?{x:Math.max(left,minX-2),y:Math.max(0,top-2),w:Math.min(right,maxX+3)-Math.max(left,minX-2),h:Math.min(img.height,bottom+3)-Math.max(0,top-2)}:{x:left,y:0,w:cw,h:img.height})}}
+function drawHero(){if(!art.hero)return false;const img=art.hero,walking=Math.abs(p.vx)>.15&&p.grounded,idx=walking?Math.floor(frame/7)%8:0,b=heroFrameBounds[idx]||{x:idx*img.width/8,y:0,w:img.width/8,h:img.height};g.save();if(p.facing<0){g.translate(p.x+p.w/2,0);g.scale(-1,1);g.translate(-(p.x+p.w/2),0)}const height=p.crouching?59:100,width=height*b.w/b.h;g.drawImage(img,b.x,b.y,b.w,b.h,p.x+p.w/2-width/2,p.y+p.h-height,width,height);g.restore();return true}
+let W=480,H=270;const T=16,rooms=[
+{name:'The Forgotten Settlement',w:100,h:18,ground:14,theme:'#252a32',exit:92,entry:5,platforms:[[13,11,7],[28,9,8],[45,11,9],[66,8,10],[82,11,8]],walls:[[22,12,3],[54,12,4]],water:[],items:[['balloon',9,11],['gas',10,10],['worm',14,10],['food',18,10],['gas',32,8],['gas',47,9],['lead',63,13],['dog',74,7],['worm',87,10]],child:null},
+{name:'The Rootworks',w:110,h:20,ground:16,theme:'#1b3030',exit:101,entry:7,platforms:[[12,13,10],[32,10,8],[50,13,10],[72,9,12],[91,12,10]],walls:[[25,14,4],[63,14,4]],water:[[38,16,17]],items:[['worm',15,12],['bat',36,9],['food',55,12],['gas',75,8],['lead',93,15]],child:84},
+{name:'The Drowned Passages',w:120,h:21,ground:17,theme:'#1d2c40',exit:113,entry:6,platforms:[[12,14,10],[33,12,10],[55,14,12],[79,10,12],[100,14,10]],walls:[[26,15,4],[68,15,5]],water:[[42,17,28],[89,17,18]],items:[['worm',20,13],['food',39,11],['gas',60,13],['lead',83,16],['worm',106,13]],child:96},
+{name:'The Fungal Wilds',w:130,h:22,ground:18,theme:'#28233c',exit:123,entry:6,platforms:[[14,15,11],[37,12,11],[60,15,12],[86,11,12],[110,14,12]],walls:[[29,16,5],[73,16,5]],water:[[47,18,16]],items:[['worm',19,14],['food',43,11],['gas',65,14],['lead',91,17],['worm',114,13]],child:104},
+{name:'The Threshold of Wonder',w:90,h:19,ground:15,theme:'#273c37',exit:83,entry:6,platforms:[[16,12,9],[35,10,10],[56,12,12],[74,9,9]],walls:[[27,13,3]],water:[[44,15,12]],items:[['worm',20,11],['food',40,9],['gas',60,11]],child:72}
+];
+let level=0,cam=0,frame=0,keys={},stickInput={x:0,y:0},jumpHeld=false,last=0,toast='',toastUntil=0,ended=false;
+const p={x:5*T,y:100,vx:0,vy:0,w:10,h:16,facing:1,crouching:false,grounded:false,light:48,worms:0,balloon:0,lead:0,health:5,food:3,dog:false,bat:false,rescued:0,canary:100};
+const GAME_VERSION='0.67.0';
+const versionTag=document.createElement('div');
+versionTag.id='game-version';
+versionTag.textContent='DOOMS DAY · v'+GAME_VERSION;
+versionTag.style.cssText='position:fixed;top:8px;left:50%;transform:translateX(-50%);z-index:8;background:#09111dcc;color:#f0d99d;border:1px solid #bfa36a88;border-radius:7px;padding:5px 10px;font:700 12px system-ui,sans-serif;letter-spacing:.6px;pointer-events:none;white-space:nowrap;text-shadow:0 1px 2px #000';
+document.body.appendChild(versionTag);
+const hud=document.getElementById('hud'),msg=document.getElementById('message');
+function say(s){toast=s;toastUntil=frame+210}
+function groundY(r){return r.ground*T}
+function solidRects(r){let a=[[0,groundY(r),r.w*T,400,'rock']];for(const [x,y,w] of r.platforms)a.push([x*T,y*T,w*T,7,'rock']);for(const [x,y,w] of r.walls)a.push([x*T,y*T,w*T,(r.ground-y)*T,'rock']);for(const [x,y,w] of (r.ledges||[]))a.push([x*T,y*T,w*T,5,'oneway']);return a}
+function collide(a,b){return a.x<b[0]+b[2]&&a.x+a.w>b[0]&&a.y<b[1]+b[3]&&a.y+a.h>b[1]}
+function moveAxis(axis,amount,rects){const oldY=p.y;p[axis]+=amount;for(const b of rects)if(collide(p,b)){if(b[4]==='oneway'){if(axis==='x'||amount<=0||oldY+p.h>b[1]+2)continue;p.y=b[1]-p.h;p.grounded=true;p.vy=0;continue}if(axis==='x'){p.x=amount>0?b[0]-p.w:b[0]+b[2];p.vx=0}else{p.y=amount>0?b[1]-p.h:b[1]+b[3];if(amount>0)p.grounded=true;p.vy=0}}}
+function pickupBox(it){const [type,x,y]=it;return {x:x*T-4,y:y*T-5,w:8,h:9}}
+function touchingPickup(it){const a=pickupBox(it);return collide(p,[a.x,a.y,a.w,a.h])}
+function resetPosition(){p.x=rooms[level].entry*T;p.y=groundY(rooms[level])-p.h-4;p.vx=0;p.vy=0;cam=0}
+function advance(){if(level<rooms.length-1){level++;resetPosition();say('A hidden passage leads deeper...')}else{ended=true;say('Beyond the final passage, a world of impossible beauty awaits. To be continued.')}} 
+function update(){frame++;if(ended)return;
+const r=rooms[level],down=keys.down||keys.ArrowDown||keys.s||stickInput.y>.4,up=keys.up||keys.ArrowUp||keys.w||stickInput.y<-.4,jump=keys.jump||keys[' '],left=keys.left||keys.ArrowLeft||keys.a,right=keys.right||keys.ArrowRight||keys.d;
+const water=r.water.some(([x,y,w])=>p.x+p.w>x*T&&p.x<(x+w)*T&&p.y+p.h>y*T-35);
+const rects=solidRects(r);
+const wantsCrouch=!!down&&!water;
+if(wantsCrouch&&!p.crouching){p.y+=8;p.h=8;p.crouching=true}
+else if(!wantsCrouch&&p.crouching){const taller={x:p.x,y:p.y-8,w:p.w,h:16};if(!rects.some(b=>b[4]!=='oneway'&&collide(taller,b))){p.y-=8;p.h=16;p.crouching=false}}
+let lift=p.balloon*.018,weight=p.lead*.035,gravity=Math.max(water?-.1:.09,(water?.11:.38)-lift+weight);
+const direction=Math.max(-1,Math.min(1,(right?1:0)-(left?1:0)+stickInput.x));
+if(direction)p.facing=direction;
+p.vx=direction*(p.crouching?0.75:1.65);
+if(!jump)jumpHeld=false;
+if(jump&&!jumpHeld){jumpHeld=true;if(p.grounded){
+const impulse=p.crouching&&direction?3.2:up?7.0:5.35;
+p.vy=-impulse-p.balloon*.18+p.lead*.24;p.grounded=false;
+}}
+if(water&&jump)p.vy-=.16;if(water&&down)p.vy+=.22+p.lead*.025;
+p.vy=Math.min(7,Math.max(-11,p.vy+gravity));
+moveAxis('x',p.vx,rects);p.grounded=false;moveAxis('y',p.vy,rects);p.x=Math.max(0,Math.min(r.w*T-p.w,p.x));
+if(p.y>H+groundY(r)){p.health=Math.max(1,p.health-1);resetPosition()}for(const item of r.items){if(item[3])continue;if(touchingPickup(item)){item[3]=true;switch(item[0]){case 'worm':p.worms++;p.light=Math.min(205,72+p.worms*22);say('A glowworm joins your lantern.');break;case 'food':p.food++;p.health=Math.min(5,p.health+1);say('You gather nourishing cave mushrooms.');break;case 'balloon':p.balloon++;say('You found the red balloon! Use Up + Jump to reach higher ledges.');break;case 'gas':if(p.balloon){p.balloon=Math.min(5,p.balloon+1);say('Blue lifting gas fills the balloon.')}else say('Strange blue gas drifts upward.');break;case 'lead':p.lead=Math.min(6,p.lead+1);say('You add lead ballast to your satchel.');break;case 'dog':p.dog=true;say('A lost terrier decides to follow you.');break;case 'bat':p.bat=true;say('A friendly bat reveals hidden contours.');break}}}
+if(r.child!==null&&!r.found&&Math.abs(p.x-r.child*T)<16){r.found=true;p.rescued++;say('You found a missing child! A rescue route is now marked.')}
+if(p.x>(r.exit*T-12)&&p.y>groundY(r)-85){advance()}
+if(frame%1100===0){p.canary=Math.max(0,p.canary-6);if(p.canary<30)say('The canary needs food. Press F to feed it.')}
+cam=Math.max(0,Math.min(r.w*T-W/WORLD_ZOOM,p.x-W*.38/WORLD_ZOOM));}
+function rect(x,y,w,h,col){g.fillStyle=col;g.fillRect(Math.round(x),Math.round(y),Math.ceil(w),Math.ceil(h))}
+const WORLD_ZOOM=1.32;
+function resizeGame(){const vw=Math.max(1,window.innerWidth),vh=Math.max(1,window.innerHeight);const scale=270/Math.min(vw,vh);W=Math.round(vw*scale);H=Math.round(vh*scale);c.width=W;c.height=H;g.imageSmoothingEnabled=false}
+window.addEventListener('resize',resizeGame);window.addEventListener('orientationchange',resizeGame);resizeGame();
+function cameraY(r){const viewH=H/WORLD_ZOOM,ground=groundY(r);return Math.max(-35,Math.min(ground-65,ground-viewH+36))}
+function render(){const r=rooms[level];caveBackdrop(r);g.save();const verticalCamera=cameraY(r);g.scale(WORLD_ZOOM,WORLD_ZOOM);g.translate(-Math.floor(cam),-verticalCamera);
+if(art.cave){caveTerrain(r)}else{
+for(const b of solidRects(r)){rect(b[0],b[1],b[2],b[3],'#41454a');rect(b[0],b[1],b[2],3,'#6e7168')}
+}
+for(const [x,y,w] of r.water){rect(x*T,y*T-32,w*T,groundY(r)-(y*T-32),'#265675');for(let j=0;j<w*T;j+=15)rect(x*T+j,y*T-32+Math.sin(frame*.05+j)*2,8,2,'#5d9eaf')}
+for(const it of r.items){if(it[3])continue;const [type,x,y]=it,px=x*T,py=y*T;g.save();
+if(type==='balloon'){
+ const bob=Math.sin(frame*.045)*2,by=py-15+bob;
+ g.strokeStyle='#e8d5b7';g.lineWidth=1;g.beginPath();g.moveTo(px,by+16);g.quadraticCurveTo(px+5,by+26,px,by+37);g.stroke();
+ g.fillStyle='#9e2034';g.beginPath();g.ellipse(px,by,10,14,0,0,Math.PI*2);g.fill();
+ g.fillStyle='#e84c52';g.beginPath();g.ellipse(px-2,by-2,7,11,-.12,0,Math.PI*2);g.fill();
+ g.fillStyle='#ffc1ae';g.beginPath();g.ellipse(px-4,by-6,2,5,-.3,0,Math.PI*2);g.fill();
+ g.fillStyle='#a72a36';g.beginPath();g.moveTo(px-3,by+12);g.lineTo(px+3,by+12);g.lineTo(px,by+18);g.fill();
+}else if(type==='worm'){
+ g.shadowColor='#d5ff9a';g.shadowBlur=13;g.strokeStyle='#a9e66c';g.lineWidth=4;g.lineCap='round';g.beginPath();g.moveTo(px-7,py+3);g.quadraticCurveTo(px-3,py-9,px+2,py-3);g.quadraticCurveTo(px+8,py+4,px+10,py-5);g.stroke();g.shadowBlur=0;g.fillStyle='#f7ffd4';g.fillRect(px+8,py-7,2,2);
+}else if(type==='gas'){
+ g.shadowColor='#7de5ff';g.shadowBlur=9;g.fillStyle='#64c6dc';g.beginPath();g.ellipse(px,py,7,10,0,0,Math.PI*2);g.fill();g.fillStyle='#d7faff';g.fillRect(px-3,py-6,2,5);
+}else if(type==='food'){
+ g.fillStyle='#e2a7dc';g.beginPath();g.ellipse(px,py-5,9,5,0,Math.PI,Math.PI*2);g.fill();g.fillStyle='#e6d0aa';g.fillRect(px-2,py-5,4,11);g.fillStyle='#9c669d';g.fillRect(px-6,py-7,3,2);
+}else if(type==='lead'){g.fillStyle='#8d9ca5';g.fillRect(px-7,py-5,14,11);g.fillStyle='#c9d6d8';g.fillRect(px-5,py-3,10,2);g.strokeStyle='#56646b';g.strokeRect(px-7,py-5,14,11)}
+else{g.fillStyle=type==='dog'?'#c4a079':'#a6b9db';g.beginPath();g.ellipse(px,py,9,7,0,0,Math.PI*2);g.fill();g.fillStyle='#f4dfbb';g.fillRect(px+3,py-2,2,2)}
+g.restore();}
+if(r.child!==null&&!r.found){rect(r.child*T-4,groundY(r)-23,9,15,'#d1a975');rect(r.child*T-3,groundY(r)-27,7,7,'#e5c9a0')}
+rect(r.exit*T-4,groundY(r)-37,18,37,'#141a21');rect(r.exit*T,groundY(r)-34,10,30,'#11151c');rect(r.exit*T+3,groundY(r)-28,3,4,'#e4c78a');
+if(p.dog){rect(p.x-19,p.y+9,14,7,'#a78962');rect(p.x-17,p.y+5,7,6,'#c4a17a')}
+if(p.bat)drawBat(p.x+23,p.y-28+Math.sin(frame*.12)*5)
+const face=p.facing;
+if(!drawHero()){
+rect(p.x,p.y+(p.crouching?2:5),p.w,p.h-(p.crouching?2:5),'#8c735b');
+rect(p.x+2,p.y,p.w-3,p.crouching?5:7,'#dfbc92');
+rect(p.x-1,p.y-2,12,3,'#5d4b39');
+rect(face>0?p.x+p.w:p.x-5,p.y+(p.crouching?3:7),5,7,'#efbf64');
+rect(face>0?p.x+p.w+2:p.x-3,p.y+(p.crouching?4:8),2,3,'#fff0a4');
+}
+if(p.balloon){const bx=p.x+p.w/2,by=p.y-102-Math.min(12,p.balloon*2)+Math.sin(frame*.05)*2;g.strokeStyle='#d7c3a4';g.lineWidth=1;g.beginPath();g.moveTo(bx,by+17);g.quadraticCurveTo(bx+8,by+40,bx,p.y+2);g.stroke();drawBalloon(bx,by,1.15)}
+g.restore();
+const verticalCameraLight=Math.max(0,groundY(r)-H/WORLD_ZOOM+24);const sx=(p.x-cam+p.w/2)*WORLD_ZOOM,sy=(p.y+p.h*.43-verticalCameraLight)*WORLD_ZOOM;
+const lightRadius=Math.max(72,72+(p.worms||0)*22,p.light||0)*WORLD_ZOOM;
+// Overlay darkness using source-over; transparent center preserves the scene underneath.
+// Never use destination-out directly on the game canvas: that erases the artwork.
+const centerX=sx+p.facing*lightRadius*.12+lanternOffset.x,centerY=sy+lanternOffset.y;
+const shade=g.createRadialGradient(centerX,centerY,lightRadius*.10,centerX,centerY,lightRadius*1.22);
+shade.addColorStop(0,'rgba(4,7,13,0)');
+shade.addColorStop(.48,'rgba(4,7,13,.03)');
+shade.addColorStop(.68,'rgba(4,7,13,.26)');
+shade.addColorStop(.86,'rgba(4,7,13,.73)');
+shade.addColorStop(1,'rgba(4,7,13,.96)');
+g.fillStyle=shade;g.fillRect(0,0,W,H);
+if(p.bat)renderEcho(r,sx,sy,verticalCameraLight);
+hud.innerHTML='<span id="title">DOOMS DAY</span><br>'+r.name+'<br>♥ '+p.health+' &nbsp; ✦ '+p.worms+' &nbsp; 🎈 '+p.balloon+' &nbsp; ⚖ '+p.lead+'<br>Canary '+p.canary+'% · Children '+p.rescued+'/'+rooms.filter(a=>a.child!==null).length;
+msg.textContent=frame<toastUntil?toast:ended?'The adventure continues...':'';
+}
+function renderEcho(r,sx,sy,verticalCamera){
+ const cycle=frame%180,radius=cycle*3.8,originX=sx+20*WORLD_ZOOM,originY=sy-23*WORLD_ZOOM;
+ if(cycle>145)return;
+ g.save();g.beginPath();g.rect(0,0,W,H);g.clip();
+ g.strokeStyle='rgba(123,211,235,'+(0.22*(1-cycle/180))+')';g.lineWidth=1.4;
+ g.beginPath();g.arc(originX,originY,radius,0,Math.PI*2);g.stroke();
+ const surfaces=solidRects(r);
+ // Echo contacts: briefly outline the struck surface and return a short reflected ripple.
+ for(const b of surfaces){
+  const x=(b[0]-cam)*WORLD_ZOOM,y=(b[1]-verticalCamera)*WORLD_ZOOM,w=b[2]*WORLD_ZOOM,h=b[3]*WORLD_ZOOM;
+  if(x>W+20||x+w<0||y>H+20||y+h<0)continue;
+  const px=Math.max(x,Math.min(originX,x+w)),py=Math.max(y,Math.min(originY,y+h));
+  const dist=Math.hypot(px-originX,py-originY),delta=radius-dist;
+  if(delta>=0&&delta<55){
+   const a=.52*(1-delta/55);
+   g.strokeStyle='rgba(140,224,243,'+a+')';g.lineWidth=1.4;
+   g.beginPath();g.moveTo(Math.max(0,x),y);g.lineTo(Math.min(W,x+w),y);g.stroke();
+   g.fillStyle='rgba(175,239,255,'+a+')';
+   for(let j=0;j<5;j++){const xx=px+Math.sin(j*17+frame*.12)*14,yy=py+Math.cos(j*13+frame*.09)*6;g.fillRect(xx,yy,2,2)}
+   g.strokeStyle='rgba(120,209,232,'+(a*.5)+')';g.beginPath();g.arc(px,py,Math.max(2,delta*.55),0,Math.PI*2);g.stroke();
+  }
+ }
+ g.restore();
+}
+function loop(t){let dt=Math.min(40,t-last);last=t;if(dt>=0)update();render();requestAnimationFrame(loop)}
+document.addEventListener('keydown',e=>{keys[e.key]=true;if([' ','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key))e.preventDefault();if(e.key==='f'&&p.food>0){p.food--;p.canary=Math.min(100,p.canary+45);say('The canary chirps gratefully.')}});document.addEventListener('keyup',e=>keys[e.key]=false);window.addEventListener('blur',()=>{keys={};stickInput={x:0,y:0};jumpHeld=false;hideJoystick()});const joystickZone=document.getElementById('joystickZone'),joystick=document.getElementById('joystick'),knob=document.getElementById('stick');
+let lanternAimMode=false;const lanternOffset={x:0,y:0};const lanternButton=document.getElementById('lanternMode');
+let lanternHoldTimer=null,lanternHoldPointer=null;
+function setLanternAim(active){
+ lanternAimMode=active;
+ lanternButton.setAttribute('aria-pressed',String(active));
+ lanternButton.style.borderColor=active?'#ffce64':'#a5a48b';
+ lanternButton.classList.toggle('pressed',active);
+ stickInput.x=0;stickInput.y=0;
+ if(stickPointer!==null)hideJoystick();
+}
+lanternButton.addEventListener('pointerdown',e=>{
+ e.preventDefault();e.stopPropagation();
+ if(lanternHoldPointer!==null)return;
+ lanternHoldPointer=e.pointerId;
+ try{lanternButton.setPointerCapture(e.pointerId)}catch(_){}
+ clearTimeout(lanternHoldTimer);
+ lanternHoldTimer=setTimeout(()=>{if(lanternHoldPointer===e.pointerId){setLanternAim(true);say('Lantern aiming: drag the left side while holding the lantern.')}},350);
+});
+function releaseLantern(e){
+ if(e.pointerId!==lanternHoldPointer)return;
+ clearTimeout(lanternHoldTimer);lanternHoldTimer=null;lanternHoldPointer=null;
+ if(lanternAimMode)setLanternAim(false);
+}
+for(const eventName of ['pointerup','pointercancel','lostpointercapture'])lanternButton.addEventListener(eventName,releaseLantern);
+lanternButton.addEventListener('click',e=>{e.preventDefault();e.stopPropagation()});
+let stickPointer=null,stickCenter={x:0,y:0};
+function hideJoystick(){stickPointer=null;stickInput.x=0;stickInput.y=0;joystick.classList.remove('active')}
+function moveJoystick(e){const dx=e.clientX-stickCenter.x,dy=e.clientY-stickCenter.y,dist=Math.hypot(dx,dy),radius=42,scale=dist>radius?radius/dist:1,x=dx*scale,y=dy*scale;knob.style.left='calc(50% + '+x+'px)';knob.style.top='calc(50% + '+y+'px)';const deadzone=8;if(lanternAimMode){lanternOffset.x=Math.max(-110,Math.min(110,lanternOffset.x+x/radius*3));lanternOffset.y=Math.max(-85,Math.min(85,lanternOffset.y+y/radius*3));stickInput.x=0;stickInput.y=0}else{stickInput.x=Math.abs(x)<deadzone?0:x/radius;stickInput.y=Math.abs(y)<deadzone?0:y/radius}}
+joystickZone.addEventListener('pointerdown',e=>{if(stickPointer!==null)return;e.preventDefault();stickPointer=e.pointerId;stickCenter={x:e.clientX,y:e.clientY};joystick.style.left=e.clientX+'px';joystick.style.top=e.clientY+'px';joystick.classList.add('active');knob.style.left='50%';knob.style.top='50%';try{joystickZone.setPointerCapture(e.pointerId)}catch(_){}});
+joystickZone.addEventListener('pointermove',e=>{if(e.pointerId===stickPointer){e.preventDefault();moveJoystick(e)}});
+for(const eventName of ['pointerup','pointercancel','lostpointercapture'])joystickZone.addEventListener(eventName,e=>{if(e.pointerId===stickPointer)hideJoystick()});
+joystickZone.addEventListener('contextmenu',e=>e.preventDefault());
+const controls=document.getElementById('controls');controls.addEventListener('contextmenu',e=>e.preventDefault());controls.addEventListener('selectstart',e=>e.preventDefault());controls.addEventListener('dragstart',e=>e.preventDefault());controls.addEventListener('touchstart',e=>e.preventDefault(),{passive:false});controls.addEventListener('touchmove',e=>e.preventDefault(),{passive:false});for(const b of controls.querySelectorAll('button')){const k=b.dataset.key;const active=new Set();const release=e=>{if(e&&active.has(e.pointerId))active.delete(e.pointerId);if(!active.size){keys[k]=false;b.classList.remove('pressed')}};b.addEventListener('pointerdown',e=>{e.preventDefault();active.add(e.pointerId);keys[k]=true;b.classList.add('pressed');try{b.setPointerCapture(e.pointerId)}catch(_){}});b.addEventListener('pointerup',release);b.addEventListener('pointercancel',release);b.addEventListener('lostpointercapture',release)}
+say('Find the red balloon nearby, then explore the ledges above.');requestAnimationFrame(loop);
+</script></body></html>

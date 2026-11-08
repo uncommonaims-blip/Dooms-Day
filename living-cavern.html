@@ -19,13 +19,13 @@ html,body,button,#playControls,#playControls *,#testJoystickZone,#testJoystick,#
 #nodeHalo #haloDelete{background:rgba(255,179,185,.34)!important;color:#58121b!important}
 #nodeHalo #haloGroup.groupActive{background:rgba(126,238,174,.4)!important;color:#062b1d!important;border-color:#18794d!important}
 #nodeHalo .radial:active{background:rgba(255,225,130,.7)!important}
-#rightTools{position:fixed;right:0;top:40%;z-index:105;display:flex;align-items:flex-start;pointer-events:none}
+#rightTools{position:fixed;right:0;top:12%;z-index:105;display:flex;align-items:flex-start;pointer-events:none}
 #rightToolsTab{pointer-events:auto;writing-mode:vertical-rl;transform:rotate(180deg);border-radius:0 9px 9px 0;background:#213b52ed;color:#fff;font-weight:800;letter-spacing:.4px;border:1px solid #91afc9;padding:13px 8px;box-shadow:0 2px 12px #0009}
 #rightToolsBody{pointer-events:auto;width:min(300px,83vw);max-height:76dvh;overflow-y:auto;overscroll-behavior:contain;background:#142638f2;border:1px solid #7297b4;border-right:0;border-radius:12px 0 0 12px;padding:10px;box-shadow:0 5px 22px #000b;display:flex;flex-direction:column;gap:10px}
 #rightToolsBody[hidden]{display:none!important}
 #rightToolsBody #nodeLockDock,#rightToolsBody #snapDock,#rightToolsBody #legend,#rightToolsBody #wobbleToggle,#rightToolsBody #testSizePanel{position:static!important;inset:auto!important;right:auto!important;bottom:auto!important;top:auto!important;left:auto!important;transform:none!important;max-width:100%!important;width:100%;margin:0!important;z-index:auto!important}
 #rightToolsBody #nodeLockDock,#rightToolsBody #snapDock{justify-content:space-between}
-#rightToolsBody #testSizePanel{max-height:none!important;overflow:visible!important}
+#rightToolsBody #testSizePanel{max-height:none!important;overflow:visible!important}body.playing #rightToolsBody #testSizePanel{display:flex!important}
 #rightToolsBody #legend{font-size:12px}
 body.test-clean #rightTools{display:none!important}
 body.immersive #rightToolsBody #snapDock,body.immersive #rightToolsBody #nodeLockDock{z-index:auto}

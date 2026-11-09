@@ -544,7 +544,7 @@ async function selectCaveLevel(level){
 }
 $('#levelSelect').onchange=e=>selectCaveLevel(Number(e.target.value));
 function syncGameLevel(){for(const level of [1,2]){$('#gameCave'+level).setAttribute('aria-pressed',String(activeLevel===level))}}
-function enterGameMode(level=activeLevel){testSoundtrack.pause();musicWanted=false;updateMusicButton();if(playing)$('#mode').click();if(level!==activeLevel)selectCaveLevel(level);document.body.classList.add('game-mode');$('#gameMenu').hidden=false;$('#guides').checked=false;$('#mode').click();$('#testClean').click();syncGameLevel();requestAnimationFrame(()=>{fit();followPlayer(true)})}
+function enterGameMode(level=activeLevel){if(playing)$('#mode').click();if(level!==activeLevel)selectCaveLevel(level);document.body.classList.add('game-mode');$('#gameMenu').hidden=false;$('#guides').checked=false;$('#mode').click();$('#testClean').click();syncGameLevel();requestAnimationFrame(()=>{fit();followPlayer(true)})}
 function openWorkshopMode(){if(playing)$('#mode').click();document.body.classList.remove('game-mode','test-clean');$('#gameMenu').hidden=true;$('#guides').checked=true;fit();render();try{history.replaceState(null,'','living-cavern.html?level='+activeLevel)}catch(e){}}
 $('#gameCave1').onclick=()=>enterGameMode(1);
 $('#gameCave2').onclick=()=>enterGameMode(2);

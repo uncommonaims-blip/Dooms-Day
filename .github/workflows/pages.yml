@@ -19,10 +19,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/configure-pages@v5
-      - name: Verify v78 workshop is included
+      - name: Verify workshop version markers are consistent
         run: |
-          test -f living-cavern.html
-          grep -q 'id="gameVersion" aria-label="Game version">v78' living-cavern.html
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          html = Path('living-cavern.html').read_text()
+          badge = re.search(r'id="gameVersion"[^>]*>v(\d+)</span>', html)
+          reload_button = re.search(r'id="versionBadge"[^>]*>v(\d+) ↻</button>', html)
+          assert badge, 'Game version label missing'
+          assert reload_button, 'Workshop version badge missing'
+          assert badge.group(1) == reload_button.group(1), 'Workshop version markers disagree'
+          print('Verified workshop v' + badge.group(1))
+          PY
       - uses: actions/upload-pages-artifact@v3
         with:
           path: .

@@ -500,7 +500,7 @@ window.addEventListener('pagehide',()=>{saveCalibratorState();clearTimeout(autos
 document.addEventListener('visibilitychange',()=>{if(document.hidden){saveCalibratorState();clearTimeout(autosaveTimer);clearTimeout(viewSaveTimer);persistMap();saveView()}});
 
 const starterMap=[{"type":"floor","points":[{"x":0,"y":378},{"x":72,"y":377},{"x":126,"y":384},{"x":181,"y":398},{"x":225,"y":407}]},{"type":"floor","points":[{"x":231,"y":411},{"x":274,"y":425},{"x":313,"y":445},{"x":351,"y":450}]},{"type":"floor","points":[{"x":379,"y":437},{"x":417,"y":410},{"x":451,"y":401},{"x":484,"y":414}]},{"type":"platform","points":[{"x":168,"y":313},{"x":213,"y":309},{"x":258,"y":316}]},{"type":"platform","points":[{"x":321,"y":338},{"x":375,"y":332},{"x":417,"y":339}]},{"type":"platform","points":[{"x":502,"y":310},{"x":565,"y":305},{"x":622,"y":314}]},{"type":"floor","points":[{"x":570,"y":452},{"x":628,"y":446},{"x":682,"y":454},{"x":733,"y":466}]},{"type":"platform","points":[{"x":732,"y":357},{"x":793,"y":354},{"x":849,"y":359}]},{"type":"platform","points":[{"x":876,"y":293},{"x":925,"y":286},{"x":976,"y":290}]},{"type":"floor","points":[{"x":1021,"y":454},{"x":1077,"y":449},{"x":1136,"y":453},{"x":1194,"y":440}]},{"type":"platform","points":[{"x":1111,"y":342},{"x":1168,"y":333},{"x":1221,"y":341}]},{"type":"floor","points":[{"x":1250,"y":410},{"x":1311,"y":399},{"x":1368,"y":402},{"x":1426,"y":385},{"x":1536,"y":382}]},{"type":"ceiling","points":[{"x":0,"y":88},{"x":75,"y":94},{"x":135,"y":105},{"x":183,"y":89},{"x":235,"y":96}]},{"type":"ceiling","points":[{"x":251,"y":91},{"x":314,"y":116},{"x":375,"y":97},{"x":431,"y":111},{"x":495,"y":91}]},{"type":"ceiling","points":[{"x":515,"y":77},{"x":574,"y":96},{"x":642,"y":111},{"x":710,"y":91},{"x":778,"y":103}]},{"type":"ceiling","points":[{"x":801,"y":93},{"x":869,"y":107},{"x":926,"y":92},{"x":1005,"y":109}]},{"type":"ceiling","points":[{"x":1031,"y":99},{"x":1113,"y":111},{"x":1178,"y":93},{"x":1260,"y":102},{"x":1333,"y":90},{"x":1430,"y":101},{"x":1536,"y":90}]},{"type":"hazard","points":[{"x":361,"y":492},{"x":418,"y":487},{"x":470,"y":492},{"x":532,"y":488},{"x":573,"y":498}]},{"type":"hazard","points":[{"x":741,"y":494},{"x":814,"y":487},{"x":881,"y":492},{"x":948,"y":490},{"x":1005,"y":496}]}];
-$('#resetMap').onclick=()=>{if(polys.length&&!confirm('Replace current boundaries with the starter map? Save or export your edits first.'))return;polys=JSON.parse(JSON.stringify(activeLevel===2?cave2Starter:starterMap));selected=-1;render();status('Starter map restored. Adjust points to fit the artwork.')};
+$('#resetMap').onclick=()=>{status('Starter-map reset disabled to protect your custom collision nodes. Use the recovery page for restoration.')};
 $('#save').onclick=()=>{persistMap();status('Collision geometry saved locally')};
 $('#load').onclick=()=>{try{polys=validate(JSON.parse(localStorage.getItem(key)||'{"boundaries":[]}'));selected=-1;render();status('Loaded '+polys.length+' boundaries')}catch(e){status(e.message)}};
 $('#export').onclick=()=>{const data=JSON.stringify({format:'dooms-day-collision-v1',background:activeLevel===2?cave2Assets.back:'assets/cave/cave-1-mini.mp4',still:activeLevel===2?cave2Assets.mid:'assets/cave/cave-1-still.jpg',width:W,height:H,boundaries:polys},null,2),u=URL.createObjectURL(new Blob([data],{type:'application/json'})),a=document.createElement('a');a.href=u;a.download='cave-'+activeLevel+'-collisions.json';a.click();setTimeout(()=>URL.revokeObjectURL(u),1000)};
@@ -637,8 +637,8 @@ async function selectCaveLevel(level){
   status('Cave 2: blank collision map. Use Draw boundary to trace the level.');
  }else{
   const saved=localStorage.getItem(key);
-  try{polys=saved?validate(JSON.parse(saved)):JSON.parse(JSON.stringify(starterMap))}
-  catch(e){polys=JSON.parse(JSON.stringify(starterMap));status('Cave 1 saved collision invalid: '+e.message)}
+  try{polys=saved?validate(JSON.parse(saved)):validate(JSON.parse(localStorage.getItem('dooms-v81-cave1-collisions-before-recovery')||'{"boundaries":[]}'))}
+  catch(e){polys=[];status('Cave 1 saved collision invalid; no starter map loaded: '+e.message)}
   W=1536;H=512;still.src=caveArtSources[1];status('Cave 1 restored');
  }
  resetPlayer();loadCrystalNodes(level);loadCaveReturnLinks(level);resizeScene();viewSaveEnabled=false;restoreView();autosaveEnabled=true;render();
@@ -685,7 +685,7 @@ function crossfade(){
  }
 }
 setInterval(crossfade,25);
-try{const saved=localStorage.getItem(key);polys=saved?validate(JSON.parse(saved)):JSON.parse(JSON.stringify(starterMap));lastSavedSnapshot=saved?JSON.stringify({width:W,height:H,boundaries:polys}):null}
+try{const saved=localStorage.getItem(key);polys=saved?validate(JSON.parse(saved)):validate(JSON.parse(localStorage.getItem('dooms-v81-cave1-collisions-before-recovery')||'{"boundaries":[]}'));lastSavedSnapshot=saved?JSON.stringify({width:W,height:H,boundaries:polys}):null}
 catch(e){polys=JSON.parse(JSON.stringify(starterMap));status('Saved map could not be loaded: '+e.message)}
 autosaveEnabled=true;
 resizeScene();restoreView();

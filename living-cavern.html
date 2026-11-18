@@ -174,7 +174,7 @@ function refreshCanvasResolution(){
 }
 const caveArtSources={1:'assets/cave/cave-1-still.jpg',2:cave2Assets.mid};
 const caveArtCache=new Map();for(const level of [1,2]){const img=new Image();img.decoding='async';img.src=caveArtSources[level];caveArtCache.set(level,img)}
-still.onload=()=>{const expected=caveArtSources[activeLevel];if(!still.currentSrc.endsWith(expected)&&!still.src.endsWith(expected))return;W=still.naturalWidth||W;H=still.naturalHeight||H;resizeScene();restoreView();status('Image loaded: '+W+' × '+H)};
+still.onload=()=>{const expected=caveArtSources[activeLevel];if(!still.currentSrc.endsWith(expected)&&!still.src.endsWith(expected))return;const artW=still.naturalWidth,artH=still.naturalHeight;if(artW&&artH&&(artW!==W||artH!==H)){status('Artwork dimensions '+artW+' × '+artH+' differ from saved collision coordinates '+W+' × '+H+'; geometry preserved.');}resizeScene();restoreView();};
 // Pull down from the top edge with one finger, then release after the snap threshold.
 let refreshStart=null,refreshReady=false;
 const refreshTip=$('#pullRefresh');
@@ -475,6 +475,7 @@ function validate(data){const arr=Array.isArray(data)?data:data.boundaries;if(!A
 let key='dooms-living-cavern-collisions-v1'; // Stable across workshop versions
 let autosaveEnabled=false,autosaveTimer=null,lastSavedSnapshot=null;
 function snapshot(){return JSON.stringify({width:W,height:H,boundaries:polys})}
+function loadCollisionMap(raw,level){const data=JSON.parse(raw);const boundaries=validate(data);const w=Number(data.width),h=Number(data.height);if(!(w>0&&h>0&&w<=16384&&h<=16384))throw Error('Missing or invalid saved coordinate dimensions');W=w;H=h;return boundaries}
 function persistMap(){
  if(!autosaveEnabled)return;
  const data=snapshot();if(data===lastSavedSnapshot)return;
@@ -631,17 +632,17 @@ async function selectCaveLevel(level){
   key='dooms-living-cavern-collisions-cave2-blank-v1';
   try{
    const saved=localStorage.getItem(key);
-   polys=saved?validate(JSON.parse(saved)):[];
-  }catch(e){polys=[];status('Cave 2 saved map invalid; starting empty')}
-  W=4096;H=1365;still.src=caveArtSources[2];
+   if(!saved)throw Error('No saved Cave 2 geometry');polys=loadCollisionMap(saved,2);
+  }catch(e){polys=[];W=4096;H=1365;autosaveEnabled=false;status('Cave 2 map unavailable; autosave disabled: '+e.message)}
+  still.src=caveArtSources[2];
   status('Cave 2: blank collision map. Use Draw boundary to trace the level.');
  }else{
   const saved=localStorage.getItem(key);
-  try{polys=saved?validate(JSON.parse(saved)):validate(JSON.parse(localStorage.getItem('dooms-v81-cave1-collisions-before-recovery')||'{"boundaries":[]}'))}
-  catch(e){polys=[];status('Cave 1 saved collision invalid; no starter map loaded: '+e.message)}
-  W=1536;H=512;still.src=caveArtSources[1];status('Cave 1 restored');
+  try{if(!saved)throw Error('No saved Cave 1 geometry');polys=loadCollisionMap(saved,1)}
+  catch(e){polys=[];W=2172;H=724;autosaveEnabled=false;status('Cave 1 map unavailable; autosave disabled: '+e.message)}
+  still.src=caveArtSources[1];status('Cave 1 restored');
  }
- resetPlayer();loadCrystalNodes(level);loadCaveReturnLinks(level);resizeScene();viewSaveEnabled=false;restoreView();autosaveEnabled=true;render();
+ resetPlayer();loadCrystalNodes(level);loadCaveReturnLinks(level);resizeScene();viewSaveEnabled=false;restoreView();autosaveEnabled=polys.length>0;render();
 }
 $('#levelSelect').onchange=e=>selectCaveLevel(Number(e.target.value));
 function syncGameLevel(){for(const level of [1,2]){$('#gameCave'+level).setAttribute('aria-pressed',String(activeLevel===level))}}

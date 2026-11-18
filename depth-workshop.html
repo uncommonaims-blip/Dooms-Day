@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><title>Dooms Day · Depth Workshop</title>
+<style>
+:root{color-scheme:dark;font-family:system-ui,sans-serif}*{box-sizing:border-box}body{margin:0;background:#0b101a;color:#edf3ff}header{padding:12px 16px;display:flex;justify-content:space-between;align-items:center;gap:10px;background:#151d2b}header a{color:#93d4ff}h1{font-size:17px;margin:0}small{color:#a6b5c9}main{max-width:1050px;margin:auto;padding:10px}canvas{display:block;width:100%;height:min(57vh,560px);min-height:290px;touch-action:none;border:1px solid #43536a;border-radius:12px;background:#0a1320}.controls{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}button{background:#263c54;border:1px solid #58728d;color:white;border-radius:9px;padding:12px 16px;font-size:15px;touch-action:none}button:active{background:#4379a4}.primary{background:#1d6580}label{display:flex;align-items:center;gap:10px;margin:9px 0;font-size:14px}input[type=range]{flex:1;min-width:90px}output{min-width:42px;text-align:right;color:#91d7ff}.readout{display:flex;gap:12px;flex-wrap:wrap;font-size:13px;color:#a8c7dd}p{font-size:13px;color:#a6b5c9;line-height:1.5}</style></head>
+<body><header><div><h1>Dooms Day · Depth Workshop <small>v1</small></h1><small>Experimental 2.5D jump and camera study</small></div><a href="living-cavern.html">Main game</a></header>
+<main><canvas id="view" aria-label="Perspective platform workshop"></canvas>
+<div class="controls"><button id="back">◀ Move</button><button id="forward">Move ▶</button><button class="primary" id="jump">Jump to next platform</button><button id="reset">Reset</button></div>
+<label>Approach zone <input id="zone" type="range" min="20" max="90" value="65"><output id="zoneV">65%</output></label>
+<label>Camera catch-up <input id="lag" type="range" min="2" max="20" value="8"><output id="lagV">0.8s</output></label>
+<label>Depth scale <input id="depth" type="range" min="35" max="85" value="60"><output id="depthV">60%</output></label>
+<div class="readout"><span id="state">Ready</span><span id="scale"></span><span id="camera"></span></div>
+<p>Tap <b>Jump to next platform</b> to alternate between near and distant ledges. The character shrinks while approaching the distant ledge, holds its world scale upon landing, and the camera follows with a delayed zoom. Hold Move buttons to adjust position. Settings update live. This standalone workshop never reads or changes your saved cave maps.</p></main>
+<script>
+'use strict';
+const canvas=document.getElementById('view'),ctx=canvas.getContext('2d');
+const $=id=>document.getElementById(id),clamp=(v,a,b)=>Math.max(a,Math.min(b,v)),mix=(a,b,t)=>a+(b-a)*t;
+let near=0,worldScale=1,cameraZoom=1,landingTime=-1,flight=null,last=performance.now(),move=0,clock=0;
+const opts=()=>({zone:+$('zone').value/100,lag:+$('lag').value/10,depth:+$('depth').value/100});
+function reset(){near=0;worldScale=1;cameraZoom=1;flight=null;landingTime=-1;move=0;clock=0;}
+$('reset').onclick=reset;
+for(const [id,val] of [['zone','%'],['lag','s'],['depth','%']])$(id).oninput=()=>{$(id+'V').textContent=id==='lag'?(+$('lag').value/10).toFixed(1)+'s':$(''+id).value+val};
+function beginJump(){if(flight)return;flight={from:near,to:1-near,t:0,duration:1.4,fromScale:worldScale,toScale:(1-near)?opts().depth:1};landingTime=-1}
+$('jump').onclick=beginJump;
+for(const [id,dir] of [['back',-1],['forward',1]]){const b=$(id);b.addEventListener('pointerdown',e=>{e.preventDefault();move=dir;b.setPointerCapture(e.pointerId)});for(const type of ['pointerup','pointercancel','lostpointercapture'])b.addEventListener(type,()=>move=0)}
+window.addEventListener('keydown',e=>{if(e.code==='Space'){e.preventDefault();beginJump()}if(e.code==='ArrowLeft')move=-1;if(e.code==='ArrowRight')move=1});
+window.addEventListener('keyup',e=>{if(e.code==='ArrowLeft'||e.code==='ArrowRight')move=0});
+let horizontal=0;
+function render(t){
+ const dt=Math.min(.05,(t-last)/1000);last=t;clock+=dt;horizontal=clamp(horizontal+move*dt*.35,-.7,.7);
+ if(flight){flight.t=clamp(flight.t+dt/flight.duration,0,1);const p=flight.t,z=opts().zone,start=1-z;
+ const proximity=clamp((p-start)/z,0,1),ease=proximity*proximity*(3-2*proximity);
+ worldScale=mix(flight.fromScale,flight.toScale,ease);
+ if(p>=1){near=flight.to;worldScale=flight.toScale;flight=null;landingTime=clock}}
+ else {worldScale=near?opts().depth:1}
+ // The camera waits until landing, then smoothly compensates to restore screen size.
+ if(!flight&&landingTime>=0&&clock-landingTime>.12){const target=1/worldScale;cameraZoom+= (target-cameraZoom)*(1-Math.exp(-dt*4/opts().lag))}
+ const w=canvas.clientWidth,h=canvas.clientHeight,dpr=window.devicePixelRatio||1;
+ if(canvas.width!==Math.round(w*dpr)||canvas.height!==Math.round(h*dpr)){canvas.width=Math.round(w*dpr);canvas.height=Math.round(h*dpr)}
+ ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,w,h);
+ const cx=w*.5,cy=h*.59;
+ const gradient=ctx.createRadialGradient(cx,cy,10,cx,cy,Math.max(w,h)*.8);gradient.addColorStop(0,'#263e53');gradient.addColorStop(1,'#08111e');ctx.fillStyle=gradient;ctx.fillRect(0,0,w,h);
+ // A perspective grid provides a visible, stable sense of depth.
+ ctx.lineWidth=1;ctx.strokeStyle='#30475d';for(let i=-5;i<=5;i++){ctx.beginPath();ctx.moveTo(cx+i*22,cy-100);ctx.lineTo(cx+i*w*.22,h);ctx.stroke()}
+ for(let j=0;j<8;j++){const p=j/8,y=mix(cy-85,h,p*p);ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(w,y);ctx.stroke()}
+ const progress=flight?flight.t:near;
+ // Zoom the stage around the player after landing, leaving geometry in stable coordinates.
+ ctx.save();ctx.translate(cx,cy);ctx.scale(cameraZoom,cameraZoom);ctx.translate(-cx,-cy);
+ const farY=cy-90,nearY=cy+90;
+ function platform(y,half,color,label){ctx.fillStyle=color;ctx.beginPath();ctx.moveTo(cx-half,y);ctx.lineTo(cx+half,y);ctx.lineTo(cx+half+30,y+22);ctx.lineTo(cx-half-30,y+22);ctx.closePath();ctx.fill();ctx.strokeStyle='#a2c4d2';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(cx-half,y);ctx.lineTo(cx+half,y);ctx.stroke();ctx.fillStyle='#d6e9f5';ctx.font='13px system-ui';ctx.textAlign='center';ctx.fillText(label,cx,y+45)}
+ platform(farY,Math.min(95,w*.17),'#375a70','DISTANT PLATFORM');
+ platform(nearY,Math.min(170,w*.31),'#567181','FOREGROUND PLATFORM');
+ const x=cx+horizontal*Math.min(w*.23,125);
+ const y=mix(nearY,farY,progress)-Math.sin(Math.PI*(flight?flight.t:0))*90;
+ const s=worldScale*1.35;
+ ctx.save();ctx.translate(x,y);ctx.scale(s,s);
+ ctx.fillStyle='#ffdfb2';ctx.beginPath();ctx.arc(0,-37,9,0,Math.PI*2);ctx.fill();
+ ctx.fillStyle='#76d8d7';ctx.fillRect(-12,-27,24,23);
+ ctx.strokeStyle='#d8f5f5';ctx.lineWidth=5;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(-8,-4);ctx.lineTo(-11,0);ctx.moveTo(8,-4);ctx.lineTo(11,0);ctx.moveTo(-12,-23);ctx.lineTo(-20,-11);ctx.moveTo(12,-23);ctx.lineTo(20,-11);ctx.stroke();ctx.restore();ctx.restore();
+ $('state').textContent=flight?'In flight · '+Math.round(flight.t*100)+'%':near?'Landed · distant':'Landed · foreground';
+ $('scale').textContent='Character world scale '+Math.round(worldScale*100)+'%';
+ $('camera').textContent='Camera '+cameraZoom.toFixed(2)+'×';
+ requestAnimationFrame(render)
+}
+requestAnimationFrame(render);
+</script></body></html>

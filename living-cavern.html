@@ -686,9 +686,8 @@ function crossfade(){
  }
 }
 setInterval(crossfade,25);
-try{const saved=localStorage.getItem(key);polys=saved?validate(JSON.parse(saved)):validate(JSON.parse(localStorage.getItem('dooms-v81-cave1-collisions-before-recovery')||'{"boundaries":[]}'));lastSavedSnapshot=saved?JSON.stringify({width:W,height:H,boundaries:polys}):null}
-catch(e){polys=JSON.parse(JSON.stringify(starterMap));status('Saved map could not be loaded: '+e.message)}
-autosaveEnabled=true;
+try{const saved=localStorage.getItem(key);if(!saved)throw Error('No saved Cave 1 collision geometry');polys=loadCollisionMap(saved,1);lastSavedSnapshot=saved;autosaveEnabled=true}
+catch(e){polys=[];W=2172;H=724;autosaveEnabled=false;status('Saved Cave 1 map unavailable; autosave disabled: '+e.message)}
 resizeScene();restoreView();
 const launchParams=new URLSearchParams(location.search);
 if(launchParams.get('mode')==='game'){

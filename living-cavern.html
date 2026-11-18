@@ -559,7 +559,7 @@ function scheduleAutosave(){
 }
 function reloadWorkshop(){try{saveCalibratorState();localStorage.setItem(wobbleLayoutKey,JSON.stringify(savedTestLayout));clearTimeout(autosaveTimer);clearTimeout(viewSaveTimer);persistMap();saveView()}catch(e){console.warn('Save before reload:',e)}const url=new URL(window.location.href);url.searchParams.set('reload',String(Date.now()));window.location.replace(url.toString())}
 $('#versionBadge').addEventListener('click',e=>{e.preventDefault();e.stopPropagation();reloadWorkshop()});
-const WORKSHOP_BUILD='v84';
+const WORKSHOP_BUILD='v85';
 // Compare the running document with a fresh copy of the *deployed* page, not main-branch HEAD.
 async function checkDeployedBuild(){try{const u=new URL(window.location.href);u.searchParams.set('buildcheck',Date.now().toString());const response=await fetch(u.toString(),{cache:'no-store'});if(!response.ok)return;const html=await response.text();const match=html.match(/id="gameVersion"[^>]*>(v\d+)</);if(!match)return;const deployed=match[1];const badge=$('#versionBadge');if(deployed!==WORKSHOP_BUILD){badge.textContent=WORKSHOP_BUILD+' → '+deployed+' ↻';badge.title='New deployed version '+deployed+' available. Tap to save and reload.';}else{badge.textContent=WORKSHOP_BUILD+' ✓ ↻';badge.title='Deployed version '+deployed+' matches this page. Tap to save and reload.'}}catch(e){console.warn('Build check unavailable',e)}}
 window.addEventListener('load',()=>setTimeout(checkDeployedBuild,1200));
@@ -573,7 +573,14 @@ $('#save').onclick=()=>{persistMap();status('Collision geometry saved locally')}
 $('#load').onclick=()=>{try{polys=validate(JSON.parse(localStorage.getItem(key)||'{"boundaries":[]}'));selected=-1;render();status('Loaded '+polys.length+' boundaries')}catch(e){status(e.message)}};
 $('#export').onclick=()=>{const data=JSON.stringify({format:'dooms-day-collision-v1',background:activeLevel===2?cave2Assets.back:activeLevel===3?cave3Assets.art:'assets/cave/cave-1-mini.mp4',still:caveArtSources[activeLevel],width:W,height:H,boundaries:polys},null,2),u=URL.createObjectURL(new Blob([data],{type:'application/json'})),a=document.createElement('a');a.href=u;a.download='cave-'+activeLevel+'-collisions.json';a.click();setTimeout(()=>URL.revokeObjectURL(u),1000)};
 $('#import').onclick=()=>$('#file').click();$('#file').onchange=async e=>{try{const f=e.target.files[0];if(!f)return;polys=validate(JSON.parse(await f.text()));selected=-1;render();status('Imported '+polys.length+' boundaries')}catch(err){status(err.message)}e.target.value=''};
-let dropThroughUntil=0;function resetPlayer(){portalEntryDirections.clear();dropThroughUntil=0;player={x:Math.min(55,W*.08),y:Math.min(170,H*.4),vx:0,vy:0,w:15*characterScale,h:27*characterScale,grounded:false}}
+let dropThroughUntil=0;function caveAvatarFactor(){return activeLevel===3?4:1}
+function caveAvatarScaleKey(){return activeLevel===3?'dooms-cave3-avatar-scale-v1':characterSizeKey}
+function syncCaveAvatarScale(){
+ const stored=Number(localStorage.getItem(caveAvatarScaleKey()));
+ const scale=Number.isFinite(stored)&&stored>=.5&&stored<=10?stored:(activeLevel===3?4:characterScale);
+ setCharacterSize(scale*100);
+}
+function resetPlayer(){portalEntryDirections.clear();dropThroughUntil=0;player={x:Math.min(55,W*.08),y:Math.min(170,H*.4),vx:0,vy:0,w:15*characterScale*caveAvatarFactor(),h:27*characterScale*caveAvatarFactor(),grounded:false}}
 // Tapping the slider thumb switches between editable green and locked red.
 // A locked slider consumes taps anywhere along its track without changing value.
 const sliderLockKey='dooms-calibrator-slider-locks-v1';let sliderLocks={};try{sliderLocks=JSON.parse(localStorage.getItem(sliderLockKey)||'{}')||{}}catch(e){}
@@ -591,7 +598,7 @@ const calibratorKey='dooms-calibrator-state-v1';
 // Restore the consolidated state before any slider initialization writes defaults.
 try{const saved=JSON.parse(localStorage.getItem(calibratorKey)||'null');if(saved){if(Number.isFinite(saved.characterScale)&&saved.characterScale>=.5&&saved.characterScale<=10)characterScale=saved.characterScale;if(Number.isFinite(saved.avatarYOffset))avatarYOffset=saved.avatarYOffset;if(Number.isFinite(saved.movementSpeed)&&saved.movementSpeed>=.2&&saved.movementSpeed<=4)movementSpeed=saved.movementSpeed;if(Number.isFinite(saved.joystickSensitivity)&&saved.joystickSensitivity>=.25&&saved.joystickSensitivity<=3)joystickSensitivity=saved.joystickSensitivity;/* Music starts muted every session; saved calibrator settings must not override it. */if(typeof saved.followEnabled==='boolean')followEnabled=saved.followEnabled;if(Number.isFinite(saved.followX))followX=saved.followX;if(Number.isFinite(saved.followY))followY=saved.followY;if(saved.sliderLocks&&typeof saved.sliderLocks==='object')sliderLocks=saved.sliderLocks;if(typeof saved.calibratorCollapsed==='boolean'){calibratorCollapsed=saved.calibratorCollapsed;updateCalibrator()}updateFollowControls()}}catch(e){console.warn('Calibrator restore:',e)}
 function saveCalibratorState(){try{localStorage.setItem(calibratorKey,JSON.stringify({characterScale,avatarYOffset,movementSpeed,joystickSensitivity,followEnabled,followX,followY,musicWanted,sliderLocks,calibratorCollapsed}))}catch(e){status('Calibration could not be saved on this device')}}
-function setCharacterSize(value){const next=Math.max(.5,Math.min(10,Number(value)/100));if(!Number.isFinite(next))return;characterScale=next;player.w=15*next;player.h=27*next;$('#testSize').value=String(Math.round(next*100));$('#testSizeValue').textContent=Math.round(next*100)+'%';try{localStorage.setItem(characterSizeKey,String(next))}catch(e){}saveCalibratorState();render()}
+function setCharacterSize(value){const next=Math.max(.5,Math.min(10,Number(value)/100));if(!Number.isFinite(next))return;characterScale=next;player.w=15*next*caveAvatarFactor();player.h=27*next*caveAvatarFactor();$('#testSize').value=String(Math.round(next*100));$('#testSizeValue').textContent=Math.round(next*100)+'%';try{localStorage.setItem(caveAvatarScaleKey(),String(next))}catch(e){}saveCalibratorState();render()}
 $('#testSize').addEventListener('input',e=>setCharacterSize(e.target.value));$('#testSizeReset').onclick=()=>setCharacterSize(200);setCharacterSize(characterScale*100);
 function setAvatarOffset(y){avatarYOffset=Math.max(-200,Math.min(200,y));try{localStorage.setItem('dooms-avatar-offset-v1',String(avatarYOffset))}catch(e){}saveCalibratorState();status('Avatar vertical offset: '+avatarYOffset+' px');render()}
 $('#testAvatarUp').onclick=()=>setAvatarOffset(avatarYOffset-5);$('#testAvatarDown').onclick=()=>setAvatarOffset(avatarYOffset+5);
@@ -722,7 +729,7 @@ async function selectCaveLevel(level){
   catch(e){polys=[];W=2172;H=724;autosaveEnabled=false;status('Cave 1 map unavailable; autosave disabled: '+e.message)}
   still.src=caveArtSources[1];status('Cave 1 restored');
  }
- resetPlayer();loadCrystalNodes(level);loadCaveReturnLinks(level);resizeScene();viewSaveEnabled=false;restoreView();autosaveEnabled=level===3?!!localStorage.getItem(key):polys.length>0;if(autosaveEnabled)DoomsCheckpoints.enqueue(key,localStorage.getItem(key),'level-open').catch(e=>status('Checkpoint warning: '+e.message));render();
+ syncCaveAvatarScale();resetPlayer();loadCrystalNodes(level);loadCaveReturnLinks(level);resizeScene();viewSaveEnabled=false;restoreView();autosaveEnabled=level===3?!!localStorage.getItem(key):polys.length>0;if(autosaveEnabled)DoomsCheckpoints.enqueue(key,localStorage.getItem(key),'level-open').catch(e=>status('Checkpoint warning: '+e.message));render();
 }
 $('#levelSelect').onchange=e=>selectCaveLevel(Number(e.target.value));
 function syncGameLevel(){for(const level of [1,2,3]){$('#gameCave'+level).setAttribute('aria-pressed',String(activeLevel===level))}}

@@ -1,0 +1,64 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Dooms Day | Depth Passage</title><style>
+:root{color-scheme:dark;font-family:system-ui,sans-serif}*{box-sizing:border-box}body{margin:0;background:#070c13;color:#e5f3fa}header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 14px;background:#172333}h1{font-size:17px;margin:0}small{color:#adc1ce}a{color:#93d7ff}main{max-width:1100px;margin:auto;padding:10px}canvas{width:100%;height:min(69vh,660px);min-height:360px;display:block;border-radius:12px;border:1px solid #536d7a;touch-action:none;background:#0d1b29}.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}button,select{border:1px solid #4b7b8e;border-radius:9px;background:#234358;color:#fff;padding:10px 13px;font-size:15px}button:active{background:#397f99}label{display:flex;align-items:center;gap:10px;margin:9px 0;font-size:14px}input{flex:1;min-width:70px}output{color:#9edaf5;min-width:38px}p{font-size:13px;color:#a8bfcd;line-height:1.5}.stats{display:flex;flex-wrap:wrap;gap:14px;color:#9fd6e4;font-size:13px}</style></head>
+<body><header><div><h1>Dooms Day · The Depth Passage <small>v1</small></h1><small>Experimental depth-first playable level</small></div><a href="living-cavern.html">Main game</a></header><main>
+<canvas id="scene" aria-label="Depth passage level; tap glowing platforms to jump"></canvas>
+<div class="toolbar"><button id="previous">◀ Previous ledge</button><button id="next">Next ledge ▶</button><button id="reset">Reset</button><select id="zoomMode"><option value="ease">Smooth-start camera</option><option value="linear">Linear camera</option></select></div>
+<label>Initial zoom response <input id="response" type="range" min="0" max="100" value="15"><output id="responseV">15%</output></label>
+<label>Camera catch-up <input id="duration" type="range" min="4" max="30" value="12"><output id="durationV">1.2s</output></label>
+<label>Depth scale <input id="depth" type="range" min="35" max="85" value="56"><output id="depthV">56%</output></label>
+<div class="stats"><span id="status">Starting ledge</span><span id="scale">Character 100%</span><span id="zoom">Camera 1.00×</span></div>
+<p><b>How to play:</b> Tap a glowing neighboring platform or use Previous / Next to jump between ledges. The path zigzags left, right, upward and downward while progressing deeper into the cave. The character changes world scale during the approach; the camera waits until landing and then zooms with an adjustable slow start. Reverse direction to return toward the foreground. This is an isolated experiment; your existing cave maps are not accessed.</p>
+</main><script>
+'use strict';
+const c=document.getElementById('scene'),g=c.getContext('2d'),$=id=>document.getElementById(id);
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v)),lerp=(a,b,t)=>a+(b-a)*t,smooth=t=>t*t*(3-2*t);
+const platforms=[
+ {x:.50,y:.87,d:0,name:'Entrance'},
+ {x:.27,y:.72,d:1,name:'Western shelf'},
+ {x:.66,y:.63,d:2,name:'Broken bridge'},
+ {x:.41,y:.49,d:3,name:'Lower grotto'},
+ {x:.73,y:.39,d:4,name:'Crystal ledge'},
+ {x:.29,y:.30,d:5,name:'Far crossing'},
+ {x:.53,y:.17,d:6,name:'Deep sanctuary'}
+];
+let current=0,flight=null,cam=1,scale=1,camAnim=null,now=0,last=performance.now(),w=0,h=0,stars=[];
+function depthScale(i){return Math.pow(+$('depth').value/100,i/3)}
+function screenPlatform(p){return{x:p.x*w,y:p.y*h}}
+function start(to){if(flight||to<0||to>=platforms.length||Math.abs(to-current)!==1)return;flight={from:current,to,t:0,fromScale:scale,toScale:depthScale(to)};camAnim=null}
+$('previous').onclick=()=>start(current-1);$('next').onclick=()=>start(current+1);
+$('reset').onclick=()=>{current=0;flight=null;cam=1;scale=1;camAnim=null};
+for(const [id,suffix] of [['response','%'],['duration','s'],['depth','%']])$(id).oninput=()=>{$(id+'V').textContent=id==='duration'?(+$('duration').value/10).toFixed(1)+'s':$(id).value+suffix};
+c.addEventListener('pointerdown',e=>{const r=c.getBoundingClientRect(),x=e.clientX-r.left,y=e.clientY-r.top;let closest=-1,dist=1e9;for(let i of [current-1,current+1]){if(!platforms[i])continue;const p=screenPlatform(platforms[i]);const dx=x-p.x,dy=y-p.y;const d=Math.hypot(dx,dy);if(d<dist){dist=d;closest=i}}if(dist<Math.max(90,w*.14))start(closest)});
+window.addEventListener('keydown',e=>{if(e.key==='ArrowRight'||e.key==='ArrowUp')start(current+1);if(e.key==='ArrowLeft'||e.key==='ArrowDown')start(current-1)});
+function draw(t){
+ const dt=Math.min(.05,(t-last)/1000);last=t;now+=dt;
+ w=c.clientWidth;h=c.clientHeight;const dpr=Math.min(devicePixelRatio||1,2);if(c.width!==Math.round(w*dpr)||c.height!==Math.round(h*dpr)){c.width=Math.round(w*dpr);c.height=Math.round(h*dpr)}
+ g.setTransform(dpr,0,0,dpr,0,0);g.clearRect(0,0,w,h);
+ const bg=g.createLinearGradient(0,0,0,h);bg.addColorStop(0,'#060b15');bg.addColorStop(.55,'#172b3a');bg.addColorStop(1,'#0d1823');g.fillStyle=bg;g.fillRect(0,0,w,h);
+ // Receding cave arches and layered rock silhouettes.
+ for(let layer=0;layer<6;layer++){const k=layer/5;g.fillStyle='rgba(45,76,87,'+(.09+k*.11)+')';g.beginPath();g.moveTo(0,h);g.lineTo(0,h*(.08+k*.09));for(let j=0;j<=16;j++){const x=w*j/16,y=h*(.10+k*.08)+Math.sin(j*1.8+layer)*h*.045;g.lineTo(x,y)}g.lineTo(w,h);g.closePath();g.fill()}
+ for(let i=0;i<30;i++){const x=((i*173+41)%997)/997*w,y=((i*317+103)%997)/997*h;g.fillStyle='rgba(116,216,223,'+(.1+.12*Math.sin(now*1.4+i))+')';g.beginPath();g.arc(x,y,1.3,0,Math.PI*2);g.fill()}
+ if(flight){flight.t=clamp(flight.t+dt/1.55,0,1);const proximity=smooth(clamp((flight.t-.10)/.90,0,1));scale=lerp(flight.fromScale,flight.toScale,proximity);if(flight.t===1){current=flight.to;scale=flight.toScale;flight=null;camAnim={from:cam,to:1/scale,elapsed:0}}}
+ else scale=depthScale(current);
+ if(camAnim){const a=camAnim;a.elapsed+=dt;const u=clamp(a.elapsed/(+$('duration').value/10),0,1),initial=+$('response').value/100;const blend=$('zoomMode').value==='linear'?u:(1-initial)*smooth(u)+initial*u;cam=lerp(a.from,a.to,blend);if(u>=1)camAnim=null}
+ // Camera zoom follows the player, anchoring their feet near the lower middle of the viewport.
+ const from=platforms[flight?.from??current],to=platforms[flight?.to??current],progress=flight?flight.t:0;
+ const x=lerp(from.x,to.x,progress)*w,y=lerp(from.y,to.y,progress)*h-Math.sin(progress*Math.PI)*h*.13;
+ const focusX=w*.5,focusY=h*.64;
+ const cameraX=focusX-x*cam,cameraY=focusY-y*cam;
+ g.save();g.translate(cameraX,cameraY);g.scale(cam,cam);
+ // Route bridges signal traversal, not solid collision geometry.
+ for(let i=1;i<platforms.length;i++){const a=screenPlatform(platforms[i-1]),b=screenPlatform(platforms[i]);g.strokeStyle='rgba(99,203,214,.22)';g.lineWidth=2;g.setLineDash([5,9]);g.beginPath();g.moveTo(a.x,a.y);g.lineTo(b.x,b.y);g.stroke()}g.setLineDash([]);
+ for(let i=platforms.length-1;i>=0;i--){const p=platforms[i],pt=screenPlatform(p),size=lerp(Math.min(w*.24,145),Math.min(w*.085,52),i/6);const reachable=Math.abs(i-current)===1&&!flight;
+ g.fillStyle=i===current?'#557886':'#294b5d';g.beginPath();g.moveTo(pt.x-size,pt.y);g.lineTo(pt.x+size,pt.y);g.lineTo(pt.x+size*1.2,pt.y+size*.28);g.lineTo(pt.x-size*1.2,pt.y+size*.28);g.closePath();g.fill();
+ g.strokeStyle=reachable?'#7ef3e0':'#79a9b5';g.lineWidth=reachable?4:2;g.beginPath();g.moveTo(pt.x-size,pt.y);g.lineTo(pt.x+size,pt.y);g.stroke();
+ if(reachable){g.fillStyle='rgba(116,247,220,.12)';g.beginPath();g.ellipse(pt.x,pt.y,Math.max(size,30),12,0,0,Math.PI*2);g.fill()}
+ g.fillStyle='#b4d8e4';g.font=Math.max(10,13-i*.3)+'px system-ui';g.textAlign='center';g.fillText(p.name,pt.x,pt.y+size*.55+18);
+ }
+ g.save();g.translate(x,y);g.scale(scale*1.4,scale*1.4);g.fillStyle='#ffe1b3';g.beginPath();g.arc(0,-34,8,0,Math.PI*2);g.fill();g.fillStyle='#71d6d6';g.fillRect(-10,-26,20,22);g.strokeStyle='#e2f7fa';g.lineWidth=4;g.lineCap='round';g.beginPath();g.moveTo(-7,-4);g.lineTo(-9,0);g.moveTo(7,-4);g.lineTo(9,0);g.moveTo(-10,-22);g.lineTo(-17,-12);g.moveTo(10,-22);g.lineTo(17,-12);g.stroke();g.restore();g.restore();
+ $('status').textContent=flight?'Traveling to '+platforms[flight.to].name:'Landed: '+platforms[current].name+' ('+(current+1)+'/7)';
+ $('scale').textContent='Character '+Math.round(scale*100)+'%';$('zoom').textContent='Camera '+cam.toFixed(2)+'×';
+ requestAnimationFrame(draw)
+}
+requestAnimationFrame(draw);
+</script></body></html>
